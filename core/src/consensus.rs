@@ -661,7 +661,7 @@ impl Tower {
             bank.hash(),
             bank.feature_set
                 .is_active(&feature_set::enable_tower_sync_ix::id()),
-            pop_expired
+            pop_expired,
         )
     }
 
@@ -991,24 +991,20 @@ impl Tower {
         if !self.is_recent(slot) {
             return true;
         }
-
         // Check if a slot is locked out by simulating adding a vote for that
         // slot to the current lockouts to pop any expired votes. If any of the
         // remaining voted slots are on a different fork from the checked slot,
         // it's still locked out.
         let mut vote_state = self.vote_state.clone();
-
         for slot in including {
             process_slot_vote_unchecked(&mut vote_state, *slot);
         }
-
         process_slot_vote_unchecked(&mut vote_state, slot);
         for vote in &vote_state.votes {
             if slot != vote.slot() && !ancestors.contains(&vote.slot()) {
                 return true;
             }
         }
-
         if let Some(root_slot) = vote_state.root_slot {
             if slot != root_slot {
                 // This case should never happen because bank forks purges all
@@ -1019,13 +1015,10 @@ impl Tower {
                 );
             }
         }
-
         false
     }
-
     pub fn pop_votes_locked_out_at(&self, new_votes: &mut Vec<Slot>, slot: Slot) {
         let mut vote_state = self.vote_state.clone();
-
         for i in 0..new_votes.len() {
             process_slot_vote_unchecked(&mut vote_state, new_votes[i]);
             if let Some(last_lockout) = vote_state.last_lockout() {

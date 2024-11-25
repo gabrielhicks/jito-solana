@@ -993,12 +993,10 @@ impl ReplayStage {
 
                     let mut vote_banks = vec![];
                     let mut pop_expired = true;
-
                     // If threshold voting is enabled ...
                     if let Some(threshold_ahead_count) = tower.get_threshold_ahead_count() {
                         // The most recent voted slot will be needed
                         let most_recent_voted_slot = tower.tower_slots().last().cloned();
-
                         // Find the newest mostly_confirmed_bank on vote_bank's fork
                         if let Some(mostly_confirmed_bank) =
                             ReplayStage::first_mostly_confirmed_bank(vote_bank.clone(), &progress)
@@ -1016,7 +1014,6 @@ impl ReplayStage {
                                     );
                                 }
                             }
-
                             // Also take the mostly_confirmed bank plus threshold_ahead_count banks after it, up to
                             // vote_bank.  If mostly_confirmed_bank is at or before the most recently voted slot, then
                             // slots already voted on will be included, but will be removed by the filter operation
@@ -1030,7 +1027,6 @@ impl ReplayStage {
                                 .take((threshold_ahead_count + 1) as usize)
                                 .collect::<Vec<Arc<Bank>>>(),
                             );
-
                             // Filter out:
                             // 1. Already-voted-on banks
                             // 2. Any banks which can't be voted on because they are locked out
@@ -1098,7 +1094,6 @@ impl ReplayStage {
                                 }
                                 filtered_vote_slots.push(bank.slot());
                             }
-
                             // Now filter out any banks which would increase lockout past the most recently
                             // confirmed slot on this fork to > 64.  Remove the newest first so that they can
                             // be voted on later if they end up being votable.
@@ -1118,9 +1113,7 @@ impl ReplayStage {
                                     filtered_vote_banks.truncate(filtered_vote_slots.len());
                                 }
                             }
-
                             vote_banks = filtered_vote_banks;
-
                             // If there are no banks included, then check to see if there are more than
                             // threshold_escape_count banks since the last voted bank that have not been voted on yet.
                             // If there are, vote for the oldest not voted on bank, so as not to get too far behind
@@ -1147,7 +1140,6 @@ impl ReplayStage {
                                                 unvoted_slots.push(bank.slot());
                                             }
                                         }
-
                                         if unvoted_banks.len() > (threshold_escape_count as usize) {
                                             info!(
                                                 "vote-optimizer voting on escape slot {}",
@@ -1165,7 +1157,6 @@ impl ReplayStage {
                                     }
                                 }
                             }
-
                             // Now expire votes from the tower's vote_state if they are on a different fork than the
                             // votes.  Expiring only these votes is only allowed with VoteStateUpdate, which no longer
                             // requires expiration of on-fork votes.
@@ -2629,6 +2620,7 @@ impl ReplayStage {
         wait_to_vote_slot: Option<Slot>,
         pop_expired: bool,
     ) -> Result<(), SetRootError> {
+
         assert!(!banks.is_empty());
 
         // Track the newly voted on slots so that they can be logged
@@ -2694,25 +2686,41 @@ impl ReplayStage {
                 )?;
 
                 blockstore.slots_stats.mark_rooted(new_root);
+
                 rpc_subscriptions.notify_roots(rooted_slots);
                 if let Some(sender) = bank_notification_sender {
                     sender
                         .sender
                         .send(BankNotification::NewRootBank(root_bank))
                         .unwrap_or_else(|err| warn!("bank_notification_sender failed: {:?}", err));
-                    
+
                     if let Some(new_chain) = rooted_slots_with_parents {
                         sender
                             .sender
                             .send(BankNotification::NewRootedChain(new_chain))
-                            .unwrap_or_else(|err| {
-                                warn!("bank_notification_sender failed: {:?}", err)
-                            });
+                            .unwrap_or_else(|err| warn!("bank_notification_sender failed: {:?}", err));
                     }
                 }
                 info!("new root {}", new_root);
             }
+
             let mut update_commitment_cache_time = Measure::start("update_commitment_cache");
+            // Send (voted) bank along with the updated vote account state for this node, the vote
+            // state is always newer than the one in the bank by definition, because banks can't
+            // contain vote transactions which are voting on its own slot.
+            //
+            // It should be acceptable to aggressively use the vote for our own _local view_ of
+            // commitment aggregation, although it's not guaranteed that the new vote transaction is
+            // observed by other nodes at this point.
+            //
+            // The justification stems from the assumption of the sensible voting behavior from the
+            // consensus subsystem. That's because it means there would be a slashing possibility
+            // otherwise.
+            //
+            // This behavior isn't significant normally for mainnet-beta, because staked nodes aren't
+            // servicing RPC requests. However, this eliminates artificial 1-slot delay of the
+            // `finalized` confirmation if a node is materially staked and servicing RPC requests at
+            // the same time for development purposes.
             let node_vote_state = (*vote_account_pubkey, tower.vote_state.clone());
             Self::update_commitment_cache(
                 bank.clone(),
@@ -2724,6 +2732,7 @@ impl ReplayStage {
             update_commitment_cache_time.stop();
             replay_timing.update_commitment_cache_us += update_commitment_cache_time.as_us();
         }
+
         info!("voting for window: {:?}", new_slots);
 
         Self::push_vote(

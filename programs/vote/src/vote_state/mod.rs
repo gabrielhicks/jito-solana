@@ -790,7 +790,7 @@ pub fn process_vote(
     current_slot: Slot,
     timely_vote_credits: bool,
     deprecate_unused_legacy_vote_plumbing: bool,
-     pop_expired: bool,
+    pop_expired: bool,
 ) -> Result<(), VoteError> {
     if vote.slots.is_empty() {
         return Err(VoteError::EmptySlots);
@@ -820,8 +820,8 @@ pub fn process_vote(
 
 /// "unchecked" functions used by tests and Tower
 pub fn process_vote_unchecked(
-    vote_state: &mut VoteState, 
-    vote: Vote, 
+    vote_state: &mut VoteState,
+    vote: Vote,
     pop_expired: bool,
 ) -> Result<(), VoteError> {
     if vote.slots.is_empty() {
@@ -1853,11 +1853,29 @@ mod tests {
         let slot_hashes: Vec<_> = vote.slots.iter().rev().map(|x| (*x, vote.hash)).collect();
 
         assert_eq!(
-            process_vote(&mut vote_state_a, &vote, &slot_hashes, 0, 0, true, true, true),
+            process_vote(
+                &mut vote_state_a,
+                &vote,
+                &slot_hashes,
+                0,
+                0,
+                true,
+                true,
+                true
+            ),
             Ok(())
         );
         assert_eq!(
-            process_vote(&mut vote_state_b, &vote, &slot_hashes, 0, 0, true, true, true),
+            process_vote(
+                &mut vote_state_b,
+                &vote,
+                &slot_hashes,
+                0,
+                0,
+                true,
+                true,
+                true
+            ),
             Ok(())
         );
         assert_eq!(recent_votes(&vote_state_a), recent_votes(&vote_state_b));
