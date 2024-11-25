@@ -1192,7 +1192,7 @@ impl ReplayStage {
                     }
 
                     if !vote_banks.is_empty() {
-                        Self::handle_votable_banks(
+                         if let Err(e) = Self::handle_votable_banks(
                             &vote_banks,
                             switch_fork_decision,
                             &bank_forks,
@@ -1221,7 +1221,10 @@ impl ReplayStage {
                             &drop_bank_sender,
                             wait_to_vote_slot,
                             pop_expired,
-                        );
+                          ) {
+                            error!("Unable to set root: {e}");
+                            return;
+                        }
                     }
                 }
                 voting_time.stop();
@@ -2688,7 +2691,7 @@ impl ReplayStage {
                     vote_signatures,
                     epoch_slots_frozen_slots,
                     drop_bank_sender,
-                );
+                )?;
 
                 blockstore.slots_stats.mark_rooted(new_root);
                 rpc_subscriptions.notify_roots(rooted_slots);
@@ -2707,11 +2710,6 @@ impl ReplayStage {
                             });
                     }
                 }
-                latest_root_senders.iter().for_each(|s| {
-                    if let Err(e) = s.send(new_root) {
-                        trace!("latest root send failed: {:?}", e);
-                    }
-                });
                 info!("new root {}", new_root);
             }
             let mut update_commitment_cache_time = Measure::start("update_commitment_cache");
