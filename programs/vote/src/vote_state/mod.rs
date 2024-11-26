@@ -819,7 +819,7 @@ pub fn process_vote(
 }
 
 /// "unchecked" functions used by tests and Tower
-pub fn process_vote_unchecked(vote_state: &mut VoteState,vote: Vote,pop_expired: bool) -> Result<(), VoteError> {
+pub fn process_vote_unchecked(vote_state: &mut VoteState, vote: Vote,   pop_expired: bool) -> Result<(), VoteError> {
     if vote.slots.is_empty() {
         return Err(VoteError::EmptySlots);
     }
@@ -845,7 +845,7 @@ pub fn process_slot_votes_unchecked(vote_state: &mut VoteState, slots: &[Slot]) 
 }
 
 pub fn process_slot_vote_unchecked(vote_state: &mut VoteState, slot: Slot) {
-    let _ = process_vote_unchecked(vote_state, Vote::new(vec![slot], Hash::default()), true);
+    let _ = process_vote_unchecked(vote_state, Vote::new(vec![slot], Hash::default()),true);
 }
 
 /// Authorize the given pubkey to withdraw or sign votes. This may be called multiple times,
@@ -1853,7 +1853,7 @@ mod tests {
             Ok(())
         );
         assert_eq!(
-            process_vote( &mut vote_state_b, &vote, &slot_hashes, 0, 0, true, true, true),
+            process_vote(&mut vote_state_b, &vote, &slot_hashes, 0, 0, true, true, true),
             Ok(())
         );
         assert_eq!(recent_votes(&vote_state_a), recent_votes(&vote_state_b));
@@ -3221,7 +3221,7 @@ mod tests {
                 0,
                 true,
                 true,
-                true,
+                true
             )
             .unwrap();
         }

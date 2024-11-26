@@ -41,8 +41,8 @@ use {
     },
     std::{
         cmp::Ordering,
-        collections::{HashMap, HashSet},
         fs::read_to_string,
+        collections::{HashMap, HashSet},
         ops::{
             Bound::{Included, Unbounded},
             Deref,
@@ -588,6 +588,7 @@ impl Tower {
             .unwrap_or(false)
     }
 
+
     pub fn tower_slots(&self) -> Vec<Slot> {
         self.vote_state.tower()
     }
@@ -991,20 +992,24 @@ impl Tower {
         if !self.is_recent(slot) {
             return true;
         }
+
         // Check if a slot is locked out by simulating adding a vote for that
         // slot to the current lockouts to pop any expired votes. If any of the
         // remaining voted slots are on a different fork from the checked slot,
         // it's still locked out.
         let mut vote_state = self.vote_state.clone();
+
         for slot in including {
             process_slot_vote_unchecked(&mut vote_state, *slot);
         }
+
         process_slot_vote_unchecked(&mut vote_state, slot);
         for vote in &vote_state.votes {
             if slot != vote.slot() && !ancestors.contains(&vote.slot()) {
                 return true;
             }
         }
+
         if let Some(root_slot) = vote_state.root_slot {
             if slot != root_slot {
                 // This case should never happen because bank forks purges all
@@ -1015,10 +1020,13 @@ impl Tower {
                 );
             }
         }
+
         false
     }
+
     pub fn pop_votes_locked_out_at(&self, new_votes: &mut Vec<Slot>, slot: Slot) {
         let mut vote_state = self.vote_state.clone();
+
         for i in 0..new_votes.len() {
             process_slot_vote_unchecked(&mut vote_state, new_votes[i]);
             if let Some(last_lockout) = vote_state.last_lockout() {
@@ -1030,8 +1038,7 @@ impl Tower {
             }
         }
     }
-
-    /// Checks if a vote for `candidate_slot` is usable in a switching proof
+        /// Checks if a vote for `candidate_slot` is usable in a switching proof
     /// from `last_voted_slot` to `switch_slot`.
     /// We assume `candidate_slot` is not an ancestor of `last_voted_slot`.
     ///
