@@ -16,6 +16,23 @@ jobs:
         with:
           submodules: recursive  # Ensures submodules are initialized and updated
 
+      # Install dependencies
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libssl-dev \
+            libudev-dev \
+            pkg-config \
+            zlib1g-dev \
+            llvm \
+            clang \
+            cmake \
+            make \
+            libprotobuf-dev \
+            protobuf-compiler
+          protoc --version  # Verify protoc installation
+
       # Explicitly ensure submodules are fully updated
       - name: Update Submodules
         run: |
@@ -24,7 +41,7 @@ jobs:
       # Checkout the specific branch or tag
       - name: Checkout Specific Tag
         run: |
-          git checkout ${{ github.ref_name }}  # This checks out the tag, e.g., v2.0.18-jito
+          git checkout ${{ github.ref_name }}
 
       # Capture the current commit hash
       - name: Get Commit Hash
