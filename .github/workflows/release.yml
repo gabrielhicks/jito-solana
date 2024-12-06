@@ -1,9 +1,9 @@
 name: Build and Publish Validator Release
 
 on:
-  push:
-    tags:
-      - v*
+  release:
+    types:
+      - published
 
 jobs:
   build:
@@ -38,34 +38,24 @@ jobs:
         run: |
           git submodule update --init --recursive
 
-      # Checkout the specific branch or tag
-      - name: Checkout Specific Tag
-        run: |
-          git checkout ${{ github.ref_name }}
-
-      # Capture the current commit hash
-      - name: Get Commit Hash
-        id: commit
-        run: echo "CI_COMMIT=$(git rev-parse HEAD)" >> $GITHUB_ENV
-
       # Build the validator binaries
       - name: Build Validator
         run: |
-          mkdir -p /tmp/${{ github.ref_name }}
-          ./scripts/cargo-install-all.sh --validator-only /tmp/${{ github.ref_name }}
+          mkdir -p /tmp/${{ github.event.release.tag_name }}
+          ./scripts/cargo-install-all.sh --validator-only /tmp/${{ github.event.release.tag_name }}
 
       # Package the build output
       - name: Package Release
         run: |
-          cd /tmp/${{ github.ref_name }}
-          tar -czvf validator-release-${{ github.ref_name }}.tar.gz bin/
-          mv validator-release-${{ github.ref_name }}.tar.gz $GITHUB_WORKSPACE/
+          cd /tmp/${{ github.event.release.tag_name }}
+          tar -czvf validator-release-${{ github.event.release.tag_name }}.tar.gz bin/
+          mv validator-release-${{ github.event.release.tag_name }}.tar.gz $GITHUB_WORKSPACE/
 
       # Upload the artifact as a release asset
       - name: Upload Release Asset
         uses: actions/upload-release-asset@v1
         with:
           upload_url: ${{ github.event.release.upload_url }}
-          asset_path: validator-release-${{ github.ref_name }}.tar.gz
-          asset_name: validator-release-${{ github.ref_name }}.tar.gz
+          asset_path: validator-release-${{ github.event.release.tag_name }}.tar.gz
+          asset_name: validator-release-${{ github.event.release.tag_name }}.tar.gz
           asset_content_type: application/gzip
