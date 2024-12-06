@@ -1,9 +1,9 @@
 name: Build and Publish Validator Release
 
 on:
-  release:
-    types:
-      - published
+  push:
+    tags:
+      - v*
 
 jobs:
   build:
@@ -14,10 +14,10 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v3
         with:
-          submodules: recursive  # Ensures submodules are initialized and updated
+          submodules: recursive
 
       # Install dependencies
-      - name: Install Dependencies
+      - name: Install System Dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -31,25 +31,52 @@ jobs:
             make \
             libprotobuf-dev \
             protobuf-compiler
-          protoc --version  # Verify protoc installation
 
-      # Explicitly ensure submodules are fully updated
-      - name: Update Submodules
-        run: |
-          git submodule update --init --recursive
+      # Cache cargo dependencies
+      - name: Cache Cargo Registry
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-registry-
+
+      - name: Cache Cargo Index
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-index-
+
+      # Cache target directory
+      - name: Cache Target Directory
+        uses: actions/cache@v3
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-target-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-target-
+
+      # Install Rust toolchain
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
 
       # Build the validator binaries
       - name: Build Validator
         run: |
-          mkdir -p /tmp/${{ github.event.release.tag_name }}
-          ./scripts/cargo-install-all.sh --validator-only /tmp/${{ github.event.release.tag_name }}
+          mkdir -p /tmp/${{ github.ref_name }}
+          ./scripts/cargo-install-all.sh --validator-only /tmp/${{ github.ref_name }}
 
       # Package the build output
       - name: Package Release
         run: |
-          cd /tmp/${{ github.event.release.tag_name }}
-          tar -czvf validator-release-${{ github.event.release.tag_name }}.tar.gz bin/
-          mv validator-release-${{ github.event.release.tag_name }}.tar.gz $GITHUB_WORKSPACE/
+          cd /tmp/${{ github.ref_name }}
+          tar -czvf validator-release-${{ github.ref_name }}.tar.gz bin/
+          mv validator-release-${{ github.ref_name }}.tar.gz $GITHUB_WORKSPACE/
 
       # Upload the artifact as a release asset
       - name: Upload Release Asset
@@ -58,6 +85,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ github.event.release.upload_url }}
-          asset_path: validator-release-${{ github.event.release.tag_name }}.tar.gz
-          asset_name: validator-release-${{ github.event.release.tag_name }}.tar.gz
+          asset_path: validator-release-${{ github.ref_name }}.tar.gz
+          asset_name: validator-release-${{ github.ref_name }}.tar.gz
           asset_content_type: application/gzip
