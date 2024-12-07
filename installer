@@ -37,8 +37,8 @@ main() {
 
     # Extract tarball
     printf "Extracting binaries...\n"
-    mkdir -p "$INSTALL_DIR/bin"
-    tar -xzvf "$temp_dir/validator-release.tar.gz" -C "$INSTALL_DIR/bin"
+    mkdir -p "$INSTALL_DIR"
+    tar -xzvf "$temp_dir/validator-release.tar.gz" -C "$INSTALL_DIR"
 
     # Replace active binaries
     printf "Replacing active binaries...\n"
