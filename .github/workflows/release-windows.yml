@@ -38,6 +38,7 @@ jobs:
       - name: Install Dependencies
         run: |
           choco install protoc
+          choco insall jq
           vcpkg install openssl:x64-windows-static-md
           vcpkg integrate install
 

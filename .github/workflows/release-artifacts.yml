@@ -53,7 +53,8 @@ jobs:
               llvm \
               cmake \
               make \
-              protobuf
+              protobuf \
+              jq
             ;;
           *)
             echo "Unsupported OS: $RUNNER_OS"
