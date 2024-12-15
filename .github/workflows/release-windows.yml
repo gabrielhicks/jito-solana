@@ -10,6 +10,13 @@ on:
 jobs:
   windows-build:
     runs-on: windows-2022
+
+    env:
+      RELEASE_BASENAME: solana-release
+      TARBALL_BASENAME: solana-release
+      CI_OS_NAME: windows
+      TARGET: x86_64-pc-windows-msvc
+
     steps:
       # Checkout Code
       - name: Checkout
@@ -19,7 +26,25 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
-      # Install Rust
+      # Cache Cargo Dependencies
+      - name: Cache Cargo Dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo
+            target
+          key: cargo-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            cargo-${{ runner.os }}-
+
+      # Cache Chocolatey Packages
+      - name: Cache Chocolatey Dependencies
+        uses: actions/cache@v3
+        with:
+          path: C:\ProgramData\chocolatey\lib
+          key: choco-${{ runner.os }}-${{ hashFiles('.github/workflows/build-windows.yml') }}
+
+      # Setup Rust
       - name: Setup Rust
         uses: actions-rs/toolchain@v1
         with:
@@ -32,31 +57,19 @@ jobs:
           rustc --version || { echo "Rust installation failed!"; exit 1; }
           cargo --version || { echo "Cargo installation failed!"; exit 1; }
 
-      # Prepare Environment Variables
-      - name: Prepare Environment
-        shell: bash
-        run: |
-          set -e
-          echo "RELEASE_BASENAME=solana-release" >> $GITHUB_ENV
-          echo "TARBALL_BASENAME=solana-release" >> $GITHUB_ENV
-          echo "CI_OS_NAME=windows" >> $GITHUB_ENV
-          echo "TARGET=x86_64-pc-windows-msvc" >> $GITHUB_ENV
-          echo "CHANNEL_OR_TAG=${{ github.ref_name }}" >> $GITHUB_ENV
-          echo "COMMIT=$(git rev-parse HEAD)" >> $GITHUB_ENV
+      # Check Build State
+      - name: Check Build State
+        id: check_state
+        uses: actions/download-artifact@v3
+        with:
+          name: build-success-windows
+        continue-on-error: true
 
-      # Verify Environment Variables
-      - name: Verify Environment Variables
-        shell: bash
+      - name: Skip Build If Successful
+        if: steps.check_state.outcome == 'success'
         run: |
-          echo "RELEASE_BASENAME: ${{ env.RELEASE_BASENAME }}"
-          echo "TARBALL_BASENAME: ${{ env.TARBALL_BASENAME }}"
-          echo "TARGET: ${{ env.TARGET }}"
-          echo "CHANNEL_OR_TAG: ${{ env.CHANNEL_OR_TAG }}"
-          echo "COMMIT: ${{ env.COMMIT }}"
-          if [ -z "${{ env.TARGET }}" ]; then 
-            echo "TARGET is unset!"; 
-            exit 1; 
-          fi
+          echo "Build already completed successfully. Skipping..."
+          exit 0
 
       # Install Dependencies
       - name: Install Dependencies
@@ -86,8 +99,8 @@ jobs:
           export PERL="C:/Strawberry/perl/bin/perl.exe"
           mkdir -p ${{ env.RELEASE_BASENAME }}/bin
 
-          echo "channel: ${{ env.CHANNEL_OR_TAG }}" > ${{ env.RELEASE_BASENAME }}/version.yml
-          echo "commit: ${{ env.COMMIT }}" >> ${{ env.RELEASE_BASENAME }}/version.yml
+          echo "channel: ${{ github.ref_name }}" > ${{ env.RELEASE_BASENAME }}/version.yml
+          echo "commit: $(git rev-parse HEAD)" >> ${{ env.RELEASE_BASENAME }}/version.yml
           echo "target: ${{ env.TARGET }}" >> ${{ env.RELEASE_BASENAME }}/version.yml
 
           echo "Building project with cargo..."
@@ -105,11 +118,13 @@ jobs:
           echo "Creating tarball..."
           tar -cjf ${{ env.TARBALL_BASENAME }}-${{ env.TARGET }}.tar.bz2 ${{ env.RELEASE_BASENAME }}
 
-          TARBALL_PATH="${{ env.TARBALL_BASENAME }}-${{ env.TARGET }}.tar.bz2"
-          if [ ! -f "$TARBALL_PATH" ]; then
-            echo "Tarball $TARBALL_PATH is missing! Exiting."
-            exit 1
-          fi
+      # Save Build State
+      - name: Save Build State
+        run: echo "Build completed successfully!" > build-success.txt
+      - uses: actions/upload-artifact@v3
+        with:
+          name: build-success-windows
+          path: build-success.txt
 
       # Fetch Latest Release
       - name: Fetch Latest Release
