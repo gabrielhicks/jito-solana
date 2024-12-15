@@ -1,11 +1,9 @@
 name: Build and Publish Windows
 
 on:
-  push:
-    branches:
-      - release/*
-      - v*-mod
-  workflow_dispatch:
+  release:
+    types: [published] 
+  workflow_dispatch:    
 
 jobs:
   windows-build:
@@ -135,17 +133,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # Extract Upload URL
-      - name: Extract Upload URL
-        shell: bash
-        run: |
-          UPLOAD_URL=$(echo '${{ steps.get_latest_release.outputs.data }}' | jq -r '.upload_url' | sed 's/{?name,label}//')
-          if [ -z "$UPLOAD_URL" ]; then 
-            echo "Failed to fetch upload URL"; 
-            exit 1; 
-          fi
-          echo "UPLOAD_URL=${UPLOAD_URL}" >> $GITHUB_ENV
-
       # Verify Files Before Upload
       - name: Verify Files
         shell: bash
@@ -174,7 +161,17 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ env.UPLOAD_URL }}
+          upload_url: ${{ github.event.release.upload_url }}
           asset_path: ${{ env.TARBALL_BASENAME }}-${{ env.TARGET }}.tar.bz2
           asset_name: ${{ env.TARBALL_BASENAME }}-${{ env.TARGET }}.tar.bz2
           asset_content_type: application/x-bzip2
+
+      - name: Upload Binary File
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: ${{ env.RELEASE_BASENAME }}/bin/agave-install-init-${{ env.TARGET }}.exe
+          asset_name: agave-install-init-${{ env.target }}
+          asset_content_type: application/octet-stream
