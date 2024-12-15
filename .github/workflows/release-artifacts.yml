@@ -3,7 +3,6 @@ name: Build and Publish Artifacts
 on:
   push:
     branches:
-      - main
       - release/*
   workflow_dispatch:
 
@@ -34,6 +33,7 @@ jobs:
 
       - name: Determine Build Target
         id: determine-target
+        shell: bash
         run: |
           case $RUNNER_OS in
           Linux)
@@ -50,7 +50,8 @@ jobs:
             echo "target=x86_64-pc-windows-msvc" >> $GITHUB_ENV
             ;;
           esac
-          echo "Determined target: ${{ env.target }}"
+          target=$(grep 'target=' $GITHUB_ENV | cut -d '=' -f 2)
+          echo "Determined target: $target"
 
       - name: Build Project
         run: |
