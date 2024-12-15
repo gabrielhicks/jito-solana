@@ -1,0 +1,104 @@
+name: Build and Publish Artifacts
+
+on:
+  push:
+    branches:
+      - main
+      - release/*
+  workflow_dispatch:
+
+jobs:
+  build-and-publish:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    env:
+      RELEASE_BASENAME: solana-release
+      TARBALL_BASENAME: solana-release
+      SOLANA_DOWNLOAD_ROOT: https://github.com/gabrielhicks/jito-solana/releases/download
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Determine Build Target
+        id: determine-target
+        run: |
+          case $RUNNER_OS in
+          Linux)
+            echo "target=x86_64-unknown-linux-gnu" >> $GITHUB_ENV
+            ;;
+          macOS)
+            cputype=$(uname -m)
+            if [[ $cputype == "arm64" ]]; then
+              cputype=aarch64
+            fi
+            echo "target=${cputype}-apple-darwin" >> $GITHUB_ENV
+            ;;
+          Windows)
+            echo "target=x86_64-pc-windows-msvc" >> $GITHUB_ENV
+            ;;
+          esac
+          echo "Determined target: ${{ env.target }}"
+
+      - name: Build Project
+        run: |
+          mkdir -p $RELEASE_BASENAME
+          echo "channel: ${{ github.ref_name }}" > $RELEASE_BASENAME/version.yml
+          echo "commit: $(git rev-parse HEAD)" >> $RELEASE_BASENAME/version.yml
+          echo "target: ${{ env.target }}" >> $RELEASE_BASENAME/version.yml
+
+          # Build release binaries
+          cargo build --release
+
+          # Copy binaries to the release directory
+          mkdir -p $RELEASE_BASENAME/bin
+          cp target/release/agave-install-init $RELEASE_BASENAME/bin/agave-install-init-${{ env.target }}
+
+          # Create solana-release tarball
+          tar cvf $TARBALL_BASENAME-${{ env.target }}.tar $RELEASE_BASENAME
+          bzip2 $TARBALL_BASENAME-${{ env.target }}.tar
+
+      - name: Package SBF SDK (Linux Only)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          mkdir -p sdk/sbf
+          echo "Packaging SBF SDK..."
+          # Add your logic to build or package the SBF SDK
+          tar cvjf sbf-sdk.tar.bz2 -C sdk sbf
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: build-artifacts-${{ matrix.os }}
+          path: |
+            $TARBALL_BASENAME-${{ env.target }}.tar.bz2
+            $RELEASE_BASENAME/version.yml
+            $RELEASE_BASENAME/bin/agave-install-init-${{ env.target }}
+            sbf-sdk.tar.bz2
+
+      - name: Publish GitHub Release
+        if: github.ref_type == 'tag'
+        uses: ncipollo/release-action@v1
+        with:
+          artifacts: |
+            $TARBALL_BASENAME-${{ env.target }}.tar.bz2
+            $RELEASE_BASENAME/version.yml
+            $RELEASE_BASENAME/bin/agave-install-init-${{ env.target }}
+            sbf-sdk.tar.bz2
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          body: |
+            Artifacts for release ${{ github.ref_name }}.
+            - agave-install-init: $SOLANA_DOWNLOAD_ROOT/${{ github.ref_name }}/agave-install-init-${{ env.target }}
+            - tarball: $SOLANA_DOWNLOAD_ROOT/${{ github.ref_name }}/$TARBALL_BASENAME-${{ env.target }}.tar.bz2
+            - SBF SDK: $SOLANA_DOWNLOAD_ROOT/${{ github.ref_name }}/sbf-sdk.tar.bz2
