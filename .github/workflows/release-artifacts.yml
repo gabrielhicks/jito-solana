@@ -55,6 +55,7 @@ jobs:
           echo "Determined target: $target"
 
       - name: Build Project
+        shell: bash
         run: |
           mkdir -p $RELEASE_BASENAME
           echo "channel: ${{ github.ref_name }}" > $RELEASE_BASENAME/version.yml
