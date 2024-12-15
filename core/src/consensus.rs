@@ -660,9 +660,8 @@ impl Tower {
             bank.slot(),
             bank.hash(),
             bank.feature_set
-                .is_active(&feature_set::enable_tower_sync_ix::id(), 
-                    pop_expired,
-                )
+                .is_active(&feature_set::enable_tower_sync_ix::id()),
+            pop_expired,
         )
     }
 
