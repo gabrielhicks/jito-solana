@@ -1,0 +1,136 @@
+name: Build and Publish Mac
+
+on:
+  push:
+    branches:
+      - release/*
+      - v*-mod
+  workflow_dispatch:
+
+jobs:
+  build-mac:
+    runs-on: macos-latest
+
+    env:
+      RELEASE_BASENAME: solana-release
+      TARBALL_BASENAME: solana-release
+      SOLANA_DOWNLOAD_ROOT: https://github.com/gabrielhicks/jito-solana/releases/download
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          submodules: 'recursive'
+
+      - name: Install System Dependencies
+        run: |
+          echo "Verifying Homebrew installation..."
+          if ! command -v brew >/dev/null; then
+            echo "Homebrew is not installed. Exiting."
+            exit 1
+          fi
+          echo "Installing dependencies..."
+          brew update
+          brew install openssl pkg-config zlib llvm cmake make protobuf jq
+
+          # Verify required commands
+          for cmd in cargo tar bzip2 jq; do
+            if ! command -v $cmd >/dev/null; then
+              echo "Required command $cmd is missing. Exiting."
+              exit 1
+            fi
+          done
+
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Verify Rust Installation
+        run: |
+          rustc --version || { echo "Rust is not installed!"; exit 1; }
+          cargo --version || { echo "Cargo is not installed!"; exit 1; }
+
+      - name: Determine Build Target
+        run: |
+          arch=$(uname -m)
+          echo "target=${arch}-apple-darwin" >> $GITHUB_ENV
+          echo "Build target: ${arch}-apple-darwin"
+
+      - name: Build Project
+        run: |
+          echo "Preparing release directory..."
+          mkdir -p $RELEASE_BASENAME
+          echo "channel: ${{ github.ref_name }}" > $RELEASE_BASENAME/version.yml
+          echo "commit: $(git rev-parse HEAD)" >> $RELEASE_BASENAME/version.yml
+          echo "target: ${{ env.target }}" >> $RELEASE_BASENAME/version.yml
+
+          echo "Building project with cargo..."
+          cargo build --release || { echo "Cargo build failed"; exit 1; }
+
+          # Verify binary exists
+          BINARY_PATH="target/release/agave-install-init"
+          if [ ! -f "$BINARY_PATH" ]; then
+            echo "Build artifact $BINARY_PATH is missing!"
+            exit 1
+          fi
+
+          echo "Copying binary to release directory..."
+          mkdir -p $RELEASE_BASENAME/bin
+          cp "$BINARY_PATH" $RELEASE_BASENAME/bin/agave-install-init-${{ env.target }}
+
+          echo "Creating tarball..."
+          tar cvf $TARBALL_BASENAME-${{ env.target }}.tar $RELEASE_BASENAME
+          bzip2 $TARBALL_BASENAME-${{ env.target }}.tar || { echo "Failed to create tarball"; exit 1; }
+
+          # Verify tarball exists
+          TARBALL_PATH="$TARBALL_BASENAME-${{ env.target }}.tar.bz2"
+          if [ ! -f "$TARBALL_PATH" ]; then
+            echo "Tarball $TARBALL_PATH is missing!"
+            exit 1
+          fi
+
+      - name: Fetch Latest Release
+        id: get_latest_release
+        uses: octokit/request-action@v2.x
+        with:
+          route: GET /repos/${{ github.repository }}/releases/tags/${{ github.ref_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Upload URL
+        run: |
+          UPLOAD_URL=$(echo '${{ steps.get_latest_release.outputs.data }}' | jq -r '.upload_url' | sed 's/{?name,label}//')
+          if [ -z "$UPLOAD_URL" ]; then
+            echo "Failed to retrieve upload URL."
+            exit 1
+          fi
+          echo "UPLOAD_URL=${UPLOAD_URL}" >> $GITHUB_ENV
+          echo "Release Upload URL: $UPLOAD_URL"
+
+      - name: Verify Files Before Upload
+        run: |
+          echo "Verifying tarball and version file..."
+          ls -lh $TARBALL_BASENAME-${{ env.target }}.tar.bz2 || { echo "Tarball missing!"; exit 1; }
+          ls -lh $RELEASE_BASENAME/version.yml || { echo "Version file missing!"; exit 1; }
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: build-artifacts-macos
+          path: |
+            $TARBALL_BASENAME-${{ env.target }}.tar.bz2
+            $RELEASE_BASENAME/version.yml
+            $RELEASE_BASENAME/bin/agave-install-init-${{ env.target }}
+
+      - name: Upload Release Tarball
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ env.UPLOAD_URL }}
+          asset_path: $TARBALL_BASENAME-${{ env.target }}.tar.bz2
+          asset_name: $TARBALL_BASENAME-${{ env.target }}.tar.bz2
+          asset_content_type: application/x-bzip2
