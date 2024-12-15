@@ -112,18 +112,18 @@ jobs:
 
       - name: Verify Files Before Upload
         run: |
-          echo "Verifying tarball and version file..."
-          ls -lh $TARBALL_BASENAME-${{ env.target }}.tar.bz2 || { echo "Tarball missing!"; exit 1; }
-          ls -lh $RELEASE_BASENAME/version.yml || { echo "Version file missing!"; exit 1; }
+          ls -lh ${{ env.TARBALL_BASENAME }}-${{ env.target }}.tar.bz2 || { echo "Tarball missing!"; exit 1; }
+          ls -lh ${{ env.RELEASE_BASENAME }}/version.yml || { echo "Version file missing!"; exit 1; }
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v3
         with:
           name: build-artifacts-macos
           path: |
-            $TARBALL_BASENAME-${{ env.target }}.tar.bz2
-            $RELEASE_BASENAME/version.yml
-            $RELEASE_BASENAME/bin/agave-install-init-${{ env.target }}
+            ${{ env.TARBALL_BASENAME }}-${{ env.target }}.tar.bz2
+            ${{ env.RELEASE_BASENAME }}/version.yml
+            ${{ env.RELEASE_BASENAME }}/bin/agave-install-init-${{ env.target }}
+
 
       - name: Upload Release Tarball
         uses: actions/upload-release-asset@v1
