@@ -27,19 +27,39 @@ jobs:
           submodules: 'recursive'
 
       - name: Install System Dependencies
+        shell: bash
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libssl-dev \
-            libudev-dev \
-            pkg-config \
-            zlib1g-dev \
-            llvm \
-            clang \
-            cmake \
-            make \
-            libprotobuf-dev \
-            protobuf-compiler
+          case $RUNNER_OS in
+          Linux)
+            sudo apt-get update
+            sudo apt-get install -y \
+              libssl-dev \
+              libudev-dev \
+              pkg-config \
+              zlib1g-dev \
+              llvm \
+              clang \
+              cmake \
+              make \
+              libprotobuf-dev \
+              protobuf-compiler
+            ;;
+          macOS)
+            brew update
+            brew install \
+              openssl \
+              pkg-config \
+              zlib \
+              llvm \
+              cmake \
+              make \
+              protobuf
+            ;;
+          *)
+            echo "Unsupported OS: $RUNNER_OS"
+            exit 1
+            ;;
+          esac
 
       - name: Setup Rust
         uses: actions-rs/toolchain@v1
