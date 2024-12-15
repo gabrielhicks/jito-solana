@@ -85,9 +85,9 @@ jobs:
 
       - name: Package SBF SDK
         run: |
-          mkdir -p sdk/sbf
           echo "Packaging SBF SDK..."
-          tar cvjf sbf-sdk.tar.bz2 -C sdk sbf
+          mkdir -p $RELEASE_BASENAME/sdk
+          tar cvjf $RELEASE_BASENAME/sdk/sbf-sdk.tar.bz2 -C sdk sbf
           # Verify SBF SDK
           if [ ! -f sbf-sdk.tar.bz2 ]; then
             echo "SBF SDK tarball missing!"
@@ -113,8 +113,8 @@ jobs:
 
       - name: Verify Files Before Upload
         run: |
-          for file in $TARBALL_BASENAME-${{ env.target }}.tar.bz2 sbf-sdk.tar.bz2; do
-            if [ ! -f $file ]; then
+          for file in ${{ env.TARBALL_BASENAME }}-${{ env.target }}.tar.bz2 ${{ env.RELEASE_BASENAME }}/sdk/sbf-sdk.tar.bz2; do
+            if [ ! -f "$file" ]; then
               echo "File $file is missing!"
               exit 1
             fi
@@ -125,24 +125,24 @@ jobs:
         with:
           name: build-artifacts-linux
           path: |
-            $TARBALL_BASENAME-${{ env.target }}.tar.bz2
-            $RELEASE_BASENAME/version.yml
-            $RELEASE_BASENAME/bin/agave-install-init-${{ env.target }}
+            ${{ env.TARBALL_BASENAME }}-${{ env.target }}.tar.bz2
+            ${{ env.RELEASE_BASENAME }}/version.yml
+            ${{ env.RELEASE_BASENAME }}/bin/agave-install-init-${{ env.target }}
 
-      - name: Upload SBF SDK
+      - name: Upload SBF SDK Artifact
         uses: actions/upload-artifact@v3
         with:
           name: sbf-sdk-linux
-          path: sbf-sdk.tar.bz2
-
+          path: ${{ env.RELEASE_BASENAME }}/sdk/sbf-sdk.tar.bz2
+    
       - name: Upload Release Tarball
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ env.UPLOAD_URL }}
-          asset_path: $TARBALL_BASENAME-${{ env.target }}.tar.bz2
-          asset_name: $TARBALL_BASENAME-${{ env.target }}.tar.bz2
+          asset_path: ${{ env.TARBALL_BASENAME }}-${{ env.target }}.tar.bz2
+          asset_name: ${{ env.TARBALL_BASENAME }}-${{ env.target }}.tar.bz2
           asset_content_type: application/x-bzip2
 
       - name: Upload SBF SDK
@@ -151,6 +151,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ env.UPLOAD_URL }}
-          asset_path: sbf-sdk.tar.bz2
+          asset_path: ${{ env.RELEASE_BASENAME }}/sdk/sbf-sdk.tar.bz2
           asset_name: sbf-sdk.tar.bz2
           asset_content_type: application/x-bzip2
