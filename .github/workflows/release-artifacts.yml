@@ -158,7 +158,7 @@ jobs:
           asset_content_type: application/x-bzip2
 
       - name: Upload SBF SDK (Linux Only)
-        if: matrix.os == 'ubuntu-latest' && hash('sbf-sdk.tar.bz2', 'exists')
+        if: matrix.os == 'ubuntu-latest'
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
