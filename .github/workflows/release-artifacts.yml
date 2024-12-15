@@ -117,12 +117,25 @@ jobs:
           # Add your logic to build or package the SBF SDK
           tar cvjf sbf-sdk.tar.bz2 -C sdk sbf
 
+      - name: Fetch Latest Release
+        id: get_latest_release
+        uses: octokit/request-action@v2.x
+        with:
+          route: GET /repos/${{ github.repository }}/releases/latest
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Upload URL
+        run: |
+          UPLOAD_URL=$(echo '${{ steps.get_latest_release.outputs.data }}' | jq -r '.upload_url' | sed 's/{?name,label}//')
+          echo "UPLOAD_URL=${UPLOAD_URL}" >> $GITHUB_ENV
+
       - name: Upload Artifacts
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ github.event.release.upload_url }}
+          upload_url: ${{ env.UPLOAD_URL }}
           asset_path: $TARBALL_BASENAME-${{ env.target }}.tar.bz2
           asset_name: $TARBALL_BASENAME-${{ env.target }}.tar.bz2
           asset_content_type: application/x-bzip2
@@ -133,7 +146,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ github.event.release.upload_url }}
+          upload_url: ${{ env.UPLOAD_URL }}
           asset_path: sbf-sdk.tar.bz2
           asset_name: sbf-sdk.tar.bz2
           asset_content_type: application/x-bzip2
