@@ -132,8 +132,16 @@ jobs:
       # Extract Upload URL
       - name: Extract Upload URL
         run: |
-          UPLOAD_URL=$(echo '${{ steps.get_latest_release.outputs.data }}' | jq -r '.upload_url' | sed 's/{?name,label}//')
+          # Retrieve the upload_url and sanitize it
+          UPLOAD_URL=$(echo '${{ steps.get_latest_release.outputs.data }}' | jq -r '.upload_url' | sed -E 's/\{\?.*//')
+          echo "Sanitized UPLOAD_URL: $UPLOAD_URL"
           echo "UPLOAD_URL=${UPLOAD_URL}" >> $GITHUB_ENV
+
+          # Validate the upload URL
+          if [[ -z "$UPLOAD_URL" ]]; then
+            echo "Error: Failed to retrieve a valid UPLOAD_URL!"
+            exit 1
+          fi
 
       # Verify Tarball Before Upload
       - name: Verify Release Tarball
