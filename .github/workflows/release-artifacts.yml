@@ -12,7 +12,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-latest, macos-latest]
 
     env:
       RELEASE_BASENAME: solana-release
@@ -25,6 +25,21 @@ jobs:
         with:
           fetch-depth: 0
           submodules: 'recursive'
+
+      - name: Install System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libssl-dev \
+            libudev-dev \
+            pkg-config \
+            zlib1g-dev \
+            llvm \
+            clang \
+            cmake \
+            make \
+            libprotobuf-dev \
+            protobuf-compiler
 
       - name: Setup Rust
         uses: actions-rs/toolchain@v1
@@ -47,8 +62,9 @@ jobs:
             fi
             echo "target=${cputype}-apple-darwin" >> $GITHUB_ENV
             ;;
-          Windows)
-            echo "target=x86_64-pc-windows-msvc" >> $GITHUB_ENV
+          *)
+            echo "Unsupported OS: $RUNNER_OS"
+            exit 1
             ;;
           esac
           target=$(grep 'target=' $GITHUB_ENV | cut -d '=' -f 2)

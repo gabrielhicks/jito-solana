@@ -1,0 +1,75 @@
+name: Windows Release Artifacts
+
+on:
+  workflow_call:
+    inputs:
+      commit:
+        required: false
+        type: string
+
+jobs:
+  windows-build:
+    runs-on: windows-2022
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Setup Rust
+        shell: bash
+        run: |
+          rustup install stable
+          rustup default stable
+
+      - name: Prepare Environment
+        shell: bash
+        run: |
+          # Set up environment variables
+          export RELEASE_BASENAME=solana-release
+          export TARBALL_BASENAME=$RELEASE_BASENAME
+          export CI_OS_NAME=windows
+          export TARGET=x86_64-pc-windows-msvc
+          export CHANNEL_OR_TAG=${{ github.ref_name }}
+          echo "COMMIT=$(git rev-parse HEAD)" >> $GITHUB_ENV
+
+      - name: Install Dependencies
+        run: |
+          choco install protoc
+          vcpkg install openssl:x64-windows-static-md
+          vcpkg integrate install
+
+      - name: Build Project
+        shell: bash
+        run: |
+          # Ensure necessary environment variables
+          mkdir -p $RELEASE_BASENAME
+          echo "channel: $CHANNEL_OR_TAG" > $RELEASE_BASENAME/version.yml
+          echo "commit: $COMMIT" >> $RELEASE_BASENAME/version.yml
+          echo "target: $TARGET" >> $RELEASE_BASENAME/version.yml
+
+          # Build binaries
+          cargo build --release
+
+          # Copy binaries to release directory
+          mkdir -p $RELEASE_BASENAME/bin
+          cp target/release/agave-install-init $RELEASE_BASENAME/bin/agave-install-init-$TARGET
+
+          # Create tarball
+          tar -cvf $TARBALL_BASENAME-$TARGET.tar $RELEASE_BASENAME
+          bzip2 $TARBALL_BASENAME-$TARGET.tar
+
+      - name: Prepare Upload Files
+        run: |
+          mkdir -p windows-release/$CHANNEL_OR_TAG
+          cp -v $TARBALL_BASENAME-$TARGET.tar.bz2 windows-release/$CHANNEL_OR_TAG/
+          cp -v $RELEASE_BASENAME/version.yml windows-release/$CHANNEL_OR_TAG/
+          cp -v $RELEASE_BASENAME/bin/agave-install-init-$TARGET windows-release/$CHANNEL_OR_TAG/
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: windows-release
+          path: windows-release/
