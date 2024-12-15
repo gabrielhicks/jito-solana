@@ -117,30 +117,23 @@ jobs:
           # Add your logic to build or package the SBF SDK
           tar cvjf sbf-sdk.tar.bz2 -C sdk sbf
 
-      - name: Upload Build Artifacts
-        uses: actions/upload-artifact@v3
+      - name: Upload Artifacts
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          name: build-artifacts-${{ matrix.os }}
-          path: |
-            $TARBALL_BASENAME-${{ env.target }}.tar.bz2
-            $RELEASE_BASENAME/version.yml
-            $RELEASE_BASENAME/bin/agave-install-init-${{ env.target }}
-            sbf-sdk.tar.bz2
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: $TARBALL_BASENAME-${{ env.target }}.tar.bz2
+          asset_name: $TARBALL_BASENAME-${{ env.target }}.tar.bz2
+          asset_content_type: application/x-bzip2
 
-      - name: Publish GitHub Release
-        if: github.ref_type == 'tag'
-        uses: ncipollo/release-action@v1
+      - name: Upload SBF SDK (Linux Only)
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          artifacts: |
-            $TARBALL_BASENAME-${{ env.target }}.tar.bz2
-            $RELEASE_BASENAME/version.yml
-            $RELEASE_BASENAME/bin/agave-install-init-${{ env.target }}
-            sbf-sdk.tar.bz2
-          token: ${{ secrets.GITHUB_TOKEN }}
-          tag: ${{ github.ref_name }}
-          name: Release ${{ github.ref_name }}
-          body: |
-            Artifacts for release ${{ github.ref_name }}.
-            - agave-install-init: $SOLANA_DOWNLOAD_ROOT/${{ github.ref_name }}/agave-install-init-${{ env.target }}
-            - tarball: $SOLANA_DOWNLOAD_ROOT/${{ github.ref_name }}/$TARBALL_BASENAME-${{ env.target }}.tar.bz2
-            - SBF SDK: $SOLANA_DOWNLOAD_ROOT/${{ github.ref_name }}/sbf-sdk.tar.bz2
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: sbf-sdk.tar.bz2
+          asset_name: sbf-sdk.tar.bz2
+          asset_content_type: application/x-bzip2

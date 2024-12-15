@@ -61,15 +61,12 @@ jobs:
           tar -cvf $TARBALL_BASENAME-$TARGET.tar $RELEASE_BASENAME
           bzip2 $TARBALL_BASENAME-$TARGET.tar
 
-      - name: Prepare Upload Files
-        run: |
-          mkdir -p windows-release/$CHANNEL_OR_TAG
-          cp -v $TARBALL_BASENAME-$TARGET.tar.bz2 windows-release/$CHANNEL_OR_TAG/
-          cp -v $RELEASE_BASENAME/version.yml windows-release/$CHANNEL_OR_TAG/
-          cp -v $RELEASE_BASENAME/bin/agave-install-init-$TARGET windows-release/$CHANNEL_OR_TAG/
-
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@v3
+      - name: Upload Windows Assets
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          name: windows-release
-          path: windows-release/
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: $TARBALL_BASENAME-${{ env.TARGET }}.tar.bz2
+          asset_name: $TARBALL_BASENAME-${{ env.TARGET }}.tar.bz2
+          asset_content_type: application/x-bzip2
