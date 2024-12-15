@@ -1,11 +1,9 @@
 name: Build and Publish Mac Artifacts
 
 on:
-  push:
-    branches:
-      - release/*
-      - v*-mod
-  workflow_dispatch:
+  release:
+    types: [published] 
+  workflow_dispatch:    
 
 jobs:
   build-mac:
@@ -131,20 +129,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # Extract Upload URL
-      - name: Extract Upload URL
-        run: |
-          # Retrieve the upload_url and sanitize it
-          UPLOAD_URL=$(echo '${{ steps.get_latest_release.outputs.data }}' | jq -r '.upload_url' | sed -E 's/\{\?.*//')
-          echo "Sanitized UPLOAD_URL: $UPLOAD_URL"
-          echo "UPLOAD_URL=${UPLOAD_URL}" >> $GITHUB_ENV
-
-          # Validate the upload URL
-          if [[ -z "$UPLOAD_URL" ]]; then
-            echo "Error: Failed to retrieve a valid UPLOAD_URL!"
-            exit 1
-          fi
-
       # Verify Files Before Upload
       - name: Verify Files Before Upload
         run: |
@@ -176,21 +160,13 @@ jobs:
           ls -lh "$TARBALL" || { echo "Tarball $TARBALL does not exist!"; exit 1; }
           echo "Tarball exists and ready for upload."
 
-      # Debug Upload URL
-      - name: Debug Upload URL
-        shell: bash
-        run: |
-          echo "Upload URL: '${{ env.UPLOAD_URL }}'"
-          echo "Asset Path: '${{ env.TARBALL_BASENAME }}-${{ env.target }}.tar.bz2'"
-          echo "Asset Name: '${{ env.TARBALL_BASENAME }}-${{ env.target }}.tar.bz2'"
-
       # Upload Release Tarball
       - name: Upload Release Tarball
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ env.UPLOAD_URL }}
+          upload_url: ${{ github.event.release.upload_url }}
           asset_path: ${{ env.TARBALL_BASENAME }}-${{ env.target }}.tar.bz2
           asset_name: ${{ env.TARBALL_BASENAME }}-${{ env.target }}.tar.bz2
           asset_content_type: application/x-bzip2
@@ -200,7 +176,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ env.UPLOAD_URL }}
+          upload_url: ${{ github.event.release.upload_url }}
           asset_path: ${{ env.RELEASE_BASENAME }}/bin/agave-install-init-${{ env.target }}
           asset_name: agave-install-init-${{ env.target }}
           asset_content_type: application/octet-stream
