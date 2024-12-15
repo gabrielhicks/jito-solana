@@ -63,25 +63,27 @@ jobs:
 
       - name: Build Project
         run: |
-          mkdir -p $RELEASE_BASENAME
-          echo "channel: ${{ github.ref_name }}" > $RELEASE_BASENAME/version.yml
-          echo "commit: $(git rev-parse HEAD)" >> $RELEASE_BASENAME/version.yml
-          echo "target: ${{ env.target }}" >> $RELEASE_BASENAME/version.yml
+          mkdir -p ${{ env.RELEASE_BASENAME }}
+          echo "channel: ${{ github.ref_name }}" > ${{ env.RELEASE_BASENAME }}/version.yml
+          echo "commit: $(git rev-parse HEAD)" >> ${{ env.RELEASE_BASENAME }}/version.yml
+          echo "target: ${{ env.target }}" >> ${{ env.RELEASE_BASENAME }}/version.yml
 
-          # Build binaries
-          cargo build --release || { echo "Cargo build failed"; exit 1; }
+          echo "Building project with cargo..."
+          cargo build --release || { echo "Cargo build failed!"; exit 1; }
 
-          # Verify binary exists
-          if [ ! -f target/release/agave-install-init ]; then
-            echo "Build artifact agave-install-init is missing!"
+          BINARY_PATH="target/release/agave-install-init"
+          if [ ! -f "$BINARY_PATH" ]; then
+            echo "Build artifact $BINARY_PATH is missing!"
             exit 1
           fi
 
-          # Package binaries
-          mkdir -p $RELEASE_BASENAME/bin
-          cp target/release/agave-install-init $RELEASE_BASENAME/bin/agave-install-init-${{ env.target }}
-          tar cvf $TARBALL_BASENAME-${{ env.target }}.tar $RELEASE_BASENAME
-          bzip2 $TARBALL_BASENAME-${{ env.target }}.tar
+          echo "Copying binary to release directory..."
+          mkdir -p ${{ env.RELEASE_BASENAME }}/bin
+          cp "$BINARY_PATH" ${{ env.RELEASE_BASENAME }}/bin/agave-install-init-${{ env.target }}
+
+          echo "Creating tarball..."
+          tar -cvf ${{ env.TARBALL_BASENAME }}-${{ env.target }}.tar ${{ env.RELEASE_BASENAME }}
+          bzip2 ${{ env.TARBALL_BASENAME }}-${{ env.target }}.tar
 
       - name: Package SBF SDK
         run: |
@@ -89,7 +91,7 @@ jobs:
           mkdir -p $RELEASE_BASENAME/sdk
           tar cvjf $RELEASE_BASENAME/sdk/sbf-sdk.tar.bz2 -C sdk sbf
           # Verify SBF SDK
-          if [ ! -f sbf-sdk.tar.bz2 ]; then
+          if [ ! -f $RELEASE_BASENAME/sdk/sbf-sdk.tar.bz2 ]; then
             echo "SBF SDK tarball missing!"
             exit 1
           fi
