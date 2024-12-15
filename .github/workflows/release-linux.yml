@@ -67,7 +67,7 @@ jobs:
           mkdir -p ${{ env.RELEASE_BASENAME }}
           echo "channel: ${{ github.ref_name }}" > ${{ env.RELEASE_BASENAME }}/version.yml
           echo "commit: $(git rev-parse HEAD)" >> ${{ env.RELEASE_BASENAME }}/version.yml
-          echo "target: ${{ env.target }}" >> ${{ env.RELEASE_BASENAME }}/version.yml
+          echo "target: x86_64-unknown-linux-gnu" >> ${{ env.RELEASE_BASENAME }}/version.yml
 
           echo "Building project with cargo..."
           cargo build --release
@@ -79,9 +79,9 @@ jobs:
           fi
 
           mkdir -p ${{ env.RELEASE_BASENAME }}/bin
-          cp "$BINARY_PATH" ${{ env.RELEASE_BASENAME }}/bin/agave-install-init-${{ env.target }}
-          tar -cvf ${{ env.TARBALL_BASENAME }}-${{ env.target }}.tar ${{ env.RELEASE_BASENAME }}
-          bzip2 ${{ env.TARBALL_BASENAME }}-${{ env.target }}.tar
+          cp "$BINARY_PATH" ${{ env.RELEASE_BASENAME }}/bin/agave-install-init-x86_64-unknown-linux-gnu
+          tar -cvf ${{ env.TARBALL_BASENAME }}-x86_64-unknown-linux-gnu.tar ${{ env.RELEASE_BASENAME }}
+          bzip2 ${{ env.TARBALL_BASENAME }}-x86_64-unknown-linux-gnu.tar
 
       - name: Save Build State
         run: echo "Build completed successfully!" > build-success.txt
@@ -90,12 +90,79 @@ jobs:
           name: build-success-linux
           path: build-success.txt
 
+      - name: Package SBF SDK
+        run: |
+          echo "Packaging SBF SDK..."
+          mkdir -p ${{ env.RELEASE_BASENAME }}/sdk
+          tar -cvjf ${{ env.RELEASE_BASENAME }}/sdk/sbf-sdk.tar.bz2 -C sdk sbf
+
+          # Verify the SBF SDK tarball exists
+          if [ ! -f "${{ env.RELEASE_BASENAME }}/sdk/sbf-sdk.tar.bz2" ]; then
+            echo "SBF SDK tarball is missing!"
+            exit 1
+          fi
+          echo "SBF SDK tarball created: ${{ env.RELEASE_BASENAME }}/sdk/sbf-sdk.tar.bz2"
+
       # Upload artifacts
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v3
         with:
           name: build-artifacts-linux
           path: |
-            ${{ env.TARBALL_BASENAME }}-${{ env.target }}.tar.bz2
+            ${{ env.TARBALL_BASENAME }}-x86_64-unknown-linux-gnu.tar.bz2
             ${{ env.RELEASE_BASENAME }}/version.yml
-            ${{ env.RELEASE_BASENAME }}/bin/agave-install-init-${{ env.target }}
+            ${{ env.RELEASE_BASENAME }}/bin/agave-install-init-x86_64-unknown-linux-gnu
+
+      # Upload SBF SDK Artifact
+      - name: Upload SBF SDK Build Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: sbf-sdk-linux
+          path: ${{ env.RELEASE_BASENAME }}/sdk/sbf-sdk.tar.bz2
+
+      # Fetch Latest Release
+      - name: Fetch Latest Release
+        id: get_latest_release
+        uses: octokit/request-action@v2.x
+        with:
+          route: GET /repos/${{ github.repository }}/releases/latest
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Extract Upload URL
+      - name: Extract Upload URL
+        run: |
+          UPLOAD_URL=$(echo '${{ steps.get_latest_release.outputs.data }}' | jq -r '.upload_url' | sed 's/{?name,label}//')
+          echo "UPLOAD_URL=${UPLOAD_URL}" >> $GITHUB_ENV
+
+      # Verify Tarball Before Upload
+      - name: Verify Release Tarball
+        run: |
+          TARBALL="${{ env.TARBALL_BASENAME }}-x86_64-unknown-linux-gnu.tar.bz2"
+          if [ ! -f "$TARBALL" ]; then
+            echo "Tarball $TARBALL does not exist!"
+            exit 1
+          fi
+          echo "Tarball exists: $TARBALL"
+
+      # Upload Release Tarball
+      - name: Upload Release Tarball
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ env.UPLOAD_URL }}
+          asset_path: ${{ env.TARBALL_BASENAME }}-x86_64-unknown-linux-gnu.tar.bz2
+          asset_name: ${{ env.TARBALL_BASENAME }}-x86_64-unknown-linux-gnu.tar.bz2
+          asset_content_type: application/x-bzip2
+
+      # Upload SBF SDK Release Asset
+      - name: Upload SBF SDK Tarball
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ env.UPLOAD_URL }}
+          asset_path: ${{ env.RELEASE_BASENAME }}/sdk/sbf-sdk.tar.bz2
+          asset_name: sbf-sdk-${{ env.target }}-${{ github.ref_name }}.tar.bz2
+          asset_content_type: application/x-bzip2

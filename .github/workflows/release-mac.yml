@@ -134,10 +134,14 @@ jobs:
       # Extract Upload URL
       - name: Extract Upload URL
         run: |
-          UPLOAD_URL=$(echo '${{ steps.get_latest_release.outputs.data }}' | jq -r '.upload_url' | sed 's/{?name,label}//')
+          # Retrieve the upload_url and sanitize it
+          UPLOAD_URL=$(echo '${{ steps.get_latest_release.outputs.data }}' | jq -r '.upload_url' | sed -E 's/\{\?.*//')
+          echo "Sanitized UPLOAD_URL: $UPLOAD_URL"
           echo "UPLOAD_URL=${UPLOAD_URL}" >> $GITHUB_ENV
-          if [ -z "$UPLOAD_URL" ]; then
-            echo "Failed to retrieve upload URL!"
+
+          # Validate the upload URL
+          if [[ -z "$UPLOAD_URL" ]]; then
+            echo "Error: Failed to retrieve a valid UPLOAD_URL!"
             exit 1
           fi
 
@@ -163,6 +167,24 @@ jobs:
             ${{ env.RELEASE_BASENAME }}/version.yml
             ${{ env.RELEASE_BASENAME }}/bin/agave-install-init-${{ env.target }}
 
+      # Verify Tarball Before Upload
+      - name: Verify Tarball Before Upload
+        shell: bash
+        run: |
+          TARBALL="${{ env.TARBALL_BASENAME }}-${{ env.target }}.tar.bz2"
+          echo "Verifying file: $TARBALL"
+          ls -lh "$TARBALL" || { echo "Tarball $TARBALL does not exist!"; exit 1; }
+          echo "Tarball exists and ready for upload."
+
+      # Debug Upload URL
+      - name: Debug Upload URL
+        shell: bash
+        run: |
+          echo "Upload URL: '${{ env.UPLOAD_URL }}'"
+          echo "Asset Path: '${{ env.TARBALL_BASENAME }}-${{ env.target }}.tar.bz2'"
+          echo "Asset Name: '${{ env.TARBALL_BASENAME }}-${{ env.target }}.tar.bz2'"
+
+      # Upload Release Tarball
       - name: Upload Release Tarball
         uses: actions/upload-release-asset@v1
         env:
