@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - release/*
+      - v*-mod
   workflow_dispatch:
 
 jobs:
