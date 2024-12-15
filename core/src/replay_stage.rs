@@ -4063,7 +4063,7 @@ impl ReplayStage {
         tower: &mut Tower,
         latest_validator_votes_for_frozen_banks: &LatestValidatorVotesForFrozenBanks,
         fork_choice: &HeaviestSubtreeForkChoice,
-        last_logged_vote: &mut Slot,
+        last_logged_vote_slot: &mut Slot,
     ) -> SelectVoteAndResetForkResult {
         // Try to vote on the actual heaviest fork. If the heaviest bank is
         // locked out or fails the threshold check, the validator will:
