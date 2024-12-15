@@ -6,7 +6,8 @@ on:
       commit:
         required: false
         type: string
-
+  workflow_dispatch:
+  
 jobs:
   windows-build:
     runs-on: windows-2022
