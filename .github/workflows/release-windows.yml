@@ -11,6 +11,7 @@ jobs:
   windows-build:
     runs-on: windows-2022
     steps:
+      # Checkout Code
       - name: Checkout
         uses: actions/checkout@v3
         with:
@@ -18,16 +19,17 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
+      # Install Rust
       - name: Setup Rust
-        shell: bash
-        run: |
-          rustup install stable
-          rustup default stable
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
 
+      # Prepare Environment Variables
       - name: Prepare Environment
         shell: bash
         run: |
-          # Set up environment variables
           echo "RELEASE_BASENAME=solana-release" >> $GITHUB_ENV
           echo "TARBALL_BASENAME=solana-release" >> $GITHUB_ENV
           echo "CI_OS_NAME=windows" >> $GITHUB_ENV
@@ -35,6 +37,7 @@ jobs:
           echo "CHANNEL_OR_TAG=${{ github.ref_name }}" >> $GITHUB_ENV
           echo "COMMIT=$(git rev-parse HEAD)" >> $GITHUB_ENV
 
+      # Verify Environment Variables
       - name: Verify Environment Variables
         shell: bash
         run: |
@@ -44,17 +47,30 @@ jobs:
           echo "CHANNEL_OR_TAG: $CHANNEL_OR_TAG"
           echo "COMMIT: $COMMIT"
 
+      # Install Dependencies
       - name: Install Dependencies
         run: |
-          choco install protoc
-          choco insall jq
+          choco install protoc jq
           vcpkg install openssl:x64-windows-static-md
           vcpkg integrate install
 
+      - name: Install Strawberry Perl (Windows)
+        if: matrix.os == 'windows-2022'
+        run: |
+          choco install strawberryperl
+          perl -MCPAN -e "install Locale::Maketext::Simple"
+
+      - name: Verify Perl Installation
+        if: matrix.os == 'windows-2022'
+        run: |
+          perl --version
+          perl -e "use Locale::Maketext::Simple; print 'Perl is ready with required modules\n';"
+
+      # Build Project
       - name: Build Project
         shell: bash
         run: |
-          # Ensure necessary environment variables
+          # Prepare the release directory
           mkdir -p $RELEASE_BASENAME
           echo "channel: $CHANNEL_OR_TAG" > $RELEASE_BASENAME/version.yml
           echo "commit: $COMMIT" >> $RELEASE_BASENAME/version.yml
@@ -63,7 +79,7 @@ jobs:
           # Build binaries
           cargo build --release
 
-          # Copy binaries to release directory
+          # Copy binaries to the release directory
           mkdir -p $RELEASE_BASENAME/bin
           cp target/release/agave-install-init $RELEASE_BASENAME/bin/agave-install-init-$TARGET
 
@@ -71,6 +87,7 @@ jobs:
           tar -cvf $TARBALL_BASENAME-$TARGET.tar $RELEASE_BASENAME
           bzip2 $TARBALL_BASENAME-$TARGET.tar
 
+      # Fetch the Latest Release
       - name: Fetch Latest Release
         id: get_latest_release
         uses: octokit/request-action@v2.x
@@ -79,11 +96,23 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # Extract Upload URL
       - name: Extract Upload URL
         run: |
           UPLOAD_URL=$(echo '${{ steps.get_latest_release.outputs.data }}' | jq -r '.upload_url' | sed 's/{?name,label}//')
           echo "UPLOAD_URL=${UPLOAD_URL}" >> $GITHUB_ENV
 
+      # Upload Windows Build Artifacts
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: windows-artifacts
+          path: |
+            $TARBALL_BASENAME-${{ env.TARGET }}.tar.bz2
+            $RELEASE_BASENAME/version.yml
+            $RELEASE_BASENAME/bin/agave-install-init-${{ env.TARGET }}
+
+      # Upload Windows Release Assets
       - name: Upload Windows Assets
         uses: actions/upload-release-asset@v1
         env:
