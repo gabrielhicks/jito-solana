@@ -28,12 +28,21 @@ jobs:
         shell: bash
         run: |
           # Set up environment variables
-          export RELEASE_BASENAME=solana-release
-          export TARBALL_BASENAME=$RELEASE_BASENAME
-          export CI_OS_NAME=windows
-          export TARGET=x86_64-pc-windows-msvc
-          export CHANNEL_OR_TAG=${{ github.ref_name }}
+          echo "RELEASE_BASENAME=solana-release" >> $GITHUB_ENV
+          echo "TARBALL_BASENAME=solana-release" >> $GITHUB_ENV
+          echo "CI_OS_NAME=windows" >> $GITHUB_ENV
+          echo "TARGET=x86_64-pc-windows-msvc" >> $GITHUB_ENV
+          echo "CHANNEL_OR_TAG=${{ github.ref_name }}" >> $GITHUB_ENV
           echo "COMMIT=$(git rev-parse HEAD)" >> $GITHUB_ENV
+
+      - name: Verify Environment Variables
+        shell: bash
+        run: |
+          echo "RELEASE_BASENAME: $RELEASE_BASENAME"
+          echo "TARBALL_BASENAME: $TARBALL_BASENAME"
+          echo "TARGET: $TARGET"
+          echo "CHANNEL_OR_TAG: $CHANNEL_OR_TAG"
+          echo "COMMIT: $COMMIT"
 
       - name: Install Dependencies
         run: |
