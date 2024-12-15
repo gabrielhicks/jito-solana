@@ -1,4 +1,4 @@
-name: Windows Release Artifacts
+name: Build and Publish Windows
 
 on:
   push:
@@ -26,10 +26,16 @@ jobs:
           toolchain: stable
           override: true
 
+      - name: Verify Rust Installation
+        run: |
+          rustc --version || { echo "Rust installation failed!"; exit 1; }
+          cargo --version || { echo "Cargo installation failed!"; exit 1; }
+
       # Prepare Environment Variables
       - name: Prepare Environment
         shell: bash
         run: |
+          set -e
           echo "RELEASE_BASENAME=solana-release" >> $GITHUB_ENV
           echo "TARBALL_BASENAME=solana-release" >> $GITHUB_ENV
           echo "CI_OS_NAME=windows" >> $GITHUB_ENV
@@ -39,53 +45,69 @@ jobs:
 
       # Verify Environment Variables
       - name: Verify Environment Variables
-        shell: bash
         run: |
-          echo "RELEASE_BASENAME: $RELEASE_BASENAME"
-          echo "TARBALL_BASENAME: $TARBALL_BASENAME"
-          echo "TARGET: $TARGET"
-          echo "CHANNEL_OR_TAG: $CHANNEL_OR_TAG"
-          echo "COMMIT: $COMMIT"
+          echo "RELEASE_BASENAME: ${{ env.RELEASE_BASENAME }}"
+          echo "TARBALL_BASENAME: ${{ env.TARBALL_BASENAME }}"
+          echo "TARGET: ${{ env.TARGET }}"
+          echo "CHANNEL_OR_TAG: ${{ env.CHANNEL_OR_TAG }}"
+          echo "COMMIT: ${{ env.COMMIT }}"
+          if [ -z "${{ env.TARGET }}" ]; then echo "TARGET is unset!"; exit 1; fi
 
       # Install Dependencies
       - name: Install Dependencies
         run: |
-          choco install protoc jq
-          vcpkg install openssl:x64-windows-static-md
+          choco install protoc jq || { echo "Failed to install dependencies via Chocolatey"; exit 1; }
+          vcpkg install openssl:x64-windows-static-md || { echo "Failed to install openssl"; exit 1; }
           vcpkg integrate install
 
-      - name: Install Strawberry Perl (Windows)
+      # Install Perl and Dependencies
+      - name: Install Strawberry Perl and Dependencies
         run: |
           choco install strawberryperl
-          perl -MCPAN -e "install Locale::Maketext::Simple"
+          perl -MCPAN -e "install Locale::Maketext::Simple" || { echo "Perl module installation failed!"; exit 1; }
 
       - name: Verify Perl Installation
         run: |
-          perl --version
-          perl -e "use Locale::Maketext::Simple; print 'Perl is ready with required modules\n';"
+          perl --version || { echo "Perl is not installed correctly"; exit 1; }
+          perl -e "use Locale::Maketext::Simple; print 'Perl with required modules is ready.\n';"
 
       # Build Project
       - name: Build Project
         shell: bash
         run: |
-          # Prepare the release directory
+          set -e
+          echo "Preparing release directory..."
+          export PERL="C:/Strawberry/perl/bin/perl.exe"
+          perl --version || { echo "Perl is not available"; exit 1; }
           mkdir -p $RELEASE_BASENAME
           echo "channel: $CHANNEL_OR_TAG" > $RELEASE_BASENAME/version.yml
           echo "commit: $COMMIT" >> $RELEASE_BASENAME/version.yml
           echo "target: $TARGET" >> $RELEASE_BASENAME/version.yml
 
-          # Build binaries
-          cargo build --release
+          echo "Building project with cargo..."
+          cargo build --release || { echo "Cargo build failed!"; exit 1; }
 
-          # Copy binaries to the release directory
+          BINARY_PATH="target/release/agave-install-init"
+          if [ ! -f "$BINARY_PATH" ]; then
+            echo "Build artifact $BINARY_PATH is missing! Exiting."
+            exit 1
+          fi
+
+          echo "Copying binary to release directory..."
           mkdir -p $RELEASE_BASENAME/bin
-          cp target/release/agave-install-init $RELEASE_BASENAME/bin/agave-install-init-$TARGET
+          cp "$BINARY_PATH" $RELEASE_BASENAME/bin/agave-install-init-$TARGET
 
-          # Create tarball
+          echo "Creating tarball..."
           tar -cvf $TARBALL_BASENAME-$TARGET.tar $RELEASE_BASENAME
-          bzip2 $TARBALL_BASENAME-$TARGET.tar
+          bzip2 $TARBALL_BASENAME-$TARGET.tar || { echo "Tarball creation failed!"; exit 1; }
 
-      # Fetch the Latest Release
+          TARBALL_PATH="$TARBALL_BASENAME-$TARGET.tar.bz2"
+          if [ ! -f "$TARBALL_PATH" ]; then
+            echo "Tarball $TARBALL_PATH is missing! Exiting."
+            exit 1
+          fi
+
+      # Fetch Latest Release
       - name: Fetch Latest Release
         id: get_latest_release
         uses: octokit/request-action@v2.x
@@ -98,9 +120,16 @@ jobs:
       - name: Extract Upload URL
         run: |
           UPLOAD_URL=$(echo '${{ steps.get_latest_release.outputs.data }}' | jq -r '.upload_url' | sed 's/{?name,label}//')
+          if [ -z "$UPLOAD_URL" ]; then echo "Failed to fetch upload URL"; exit 1; fi
           echo "UPLOAD_URL=${UPLOAD_URL}" >> $GITHUB_ENV
 
-      # Upload Windows Build Artifacts
+      # Verify Files Before Upload
+      - name: Verify Files
+        run: |
+          ls -lh $TARBALL_BASENAME-${{ env.TARGET }}.tar.bz2 || { echo "Tarball missing!"; exit 1; }
+          ls -lh $RELEASE_BASENAME/version.yml || { echo "Version file missing!"; exit 1; }
+
+      # Upload Build Artifacts
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v3
         with:
@@ -110,8 +139,8 @@ jobs:
             $RELEASE_BASENAME/version.yml
             $RELEASE_BASENAME/bin/agave-install-init-${{ env.TARGET }}
 
-      # Upload Windows Release Assets
-      - name: Upload Windows Assets
+      # Upload Release Assets
+      - name: Upload Release Tarball
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,4 +1,4 @@
-name: Build and Publish Artifacts
+name: Build and Publish Linux Artifacts
 
 on:
   push:
@@ -8,11 +8,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-and-publish:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest]
+  build-linux:
+    runs-on: ubuntu-latest
 
     env:
       RELEASE_BASENAME: solana-release
@@ -27,39 +24,26 @@ jobs:
           submodules: 'recursive'
 
       - name: Install System Dependencies
-        shell: bash
         run: |
-          case $RUNNER_OS in
-          Linux)
-            sudo apt-get update
-            sudo apt-get install -y \
-              libssl-dev \
-              libudev-dev \
-              pkg-config \
-              zlib1g-dev \
-              llvm \
-              clang \
-              cmake \
-              make \
-              libprotobuf-dev \
-              protobuf-compiler
-            ;;
-          macOS)
-            brew update
-            brew install \
-              openssl \
-              pkg-config \
-              zlib \
-              llvm \
-              cmake \
-              make \
-              protobuf
-            ;;
-          *)
-            echo "Unsupported OS: $RUNNER_OS"
-            exit 1
-            ;;
-          esac
+          sudo apt-get update
+          sudo apt-get install -y \
+            libssl-dev \
+            libudev-dev \
+            pkg-config \
+            zlib1g-dev \
+            llvm \
+            clang \
+            cmake \
+            make \
+            libprotobuf-dev \
+            protobuf-compiler
+          # Verify tools
+          for tool in cargo tar bzip2 jq; do
+            if ! command -v $tool >/dev/null; then
+              echo "$tool is missing. Exiting..."
+              exit 1
+            fi
+          done
 
       - name: Setup Rust
         uses: actions-rs/toolchain@v1
@@ -67,48 +51,48 @@ jobs:
           toolchain: stable
           override: true
 
-      - name: Determine Build Target
-        id: determine-target
-        shell: bash
+      - name: Verify Rust Installation
         run: |
-          case $RUNNER_OS in
-            Linux)
-              echo "target=x86_64-unknown-linux-gnu" >> $GITHUB_ENV
-              ;;
-            macOS)
-              arch=$(uname -m)
-              echo "target=${arch}-apple-darwin" >> $GITHUB_ENV
-              ;;
-          esac
-          target=$(grep 'target=' $GITHUB_ENV | cut -d '=' -f 2)
-          echo "Determined target: $target"
+          rustc --version || { echo "Rust not installed"; exit 1; }
+          cargo --version || { echo "Cargo not installed"; exit 1; }
+
+      - name: Determine Build Target
+        run: |
+          echo "target=x86_64-unknown-linux-gnu" >> $GITHUB_ENV
+          echo "Build target: ${{ env.target }}"
 
       - name: Build Project
-        shell: bash
         run: |
           mkdir -p $RELEASE_BASENAME
           echo "channel: ${{ github.ref_name }}" > $RELEASE_BASENAME/version.yml
           echo "commit: $(git rev-parse HEAD)" >> $RELEASE_BASENAME/version.yml
           echo "target: ${{ env.target }}" >> $RELEASE_BASENAME/version.yml
 
-          # Build release binaries
-          cargo build --release
+          # Build binaries
+          cargo build --release || { echo "Cargo build failed"; exit 1; }
 
-          # Copy binaries to the release directory
+          # Verify binary exists
+          if [ ! -f target/release/agave-install-init ]; then
+            echo "Build artifact agave-install-init is missing!"
+            exit 1
+          fi
+
+          # Package binaries
           mkdir -p $RELEASE_BASENAME/bin
           cp target/release/agave-install-init $RELEASE_BASENAME/bin/agave-install-init-${{ env.target }}
-
-          # Create solana-release tarball
           tar cvf $TARBALL_BASENAME-${{ env.target }}.tar $RELEASE_BASENAME
           bzip2 $TARBALL_BASENAME-${{ env.target }}.tar
 
-      - name: Package SBF SDK (Linux Only)
-        if: matrix.os == 'ubuntu-latest'
+      - name: Package SBF SDK
         run: |
           mkdir -p sdk/sbf
           echo "Packaging SBF SDK..."
-          # Add your logic to build or package the SBF SDK
           tar cvjf sbf-sdk.tar.bz2 -C sdk sbf
+          # Verify SBF SDK
+          if [ ! -f sbf-sdk.tar.bz2 ]; then
+            echo "SBF SDK tarball missing!"
+            exit 1
+          fi
 
       - name: Fetch Latest Release
         id: get_latest_release
@@ -122,29 +106,33 @@ jobs:
         run: |
           UPLOAD_URL=$(echo '${{ steps.get_latest_release.outputs.data }}' | jq -r '.upload_url' | sed 's/{?name,label}//')
           echo "UPLOAD_URL=${UPLOAD_URL}" >> $GITHUB_ENV
-          echo "Release Upload URL: $UPLOAD_URL"
+          if [ -z "$UPLOAD_URL" ]; then
+            echo "Failed to retrieve upload URL"
+            exit 1
+          fi
 
       - name: Verify Files Before Upload
         run: |
-          ls -lh $TARBALL_BASENAME-${{ env.target }}.tar.bz2 || echo "Tarball missing!"
-          ls -lh sbf-sdk.tar.bz2 || echo "SBF SDK missing!"
+          for file in $TARBALL_BASENAME-${{ env.target }}.tar.bz2 sbf-sdk.tar.bz2; do
+            if [ ! -f $file ]; then
+              echo "File $file is missing!"
+              exit 1
+            fi
+          done
 
-      # Upload Build Artifacts (for Debugging/Verification)
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: build-artifacts-${{ matrix.os }}
+          name: build-artifacts-linux
           path: |
             $TARBALL_BASENAME-${{ env.target }}.tar.bz2
             $RELEASE_BASENAME/version.yml
             $RELEASE_BASENAME/bin/agave-install-init-${{ env.target }}
-        if: always()
 
-      - name: Upload SBF SDK (Linux Only)
-        if: matrix.os == 'ubuntu-latest'
+      - name: Upload SBF SDK
         uses: actions/upload-artifact@v3
         with:
-          name: sbf-sdk-${{ matrix.os }}
+          name: sbf-sdk-linux
           path: sbf-sdk.tar.bz2
 
       - name: Upload Release Tarball
@@ -157,8 +145,7 @@ jobs:
           asset_name: $TARBALL_BASENAME-${{ env.target }}.tar.bz2
           asset_content_type: application/x-bzip2
 
-      - name: Upload SBF SDK (Linux Only)
-        if: matrix.os == 'ubuntu-latest'
+      - name: Upload SBF SDK
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -167,4 +154,3 @@ jobs:
           asset_path: sbf-sdk.tar.bz2
           asset_name: sbf-sdk.tar.bz2
           asset_content_type: application/x-bzip2
-
