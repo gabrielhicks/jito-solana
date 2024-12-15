@@ -45,13 +45,17 @@ jobs:
 
       # Verify Environment Variables
       - name: Verify Environment Variables
+        shell: bash  # Force Bash Shell
         run: |
           echo "RELEASE_BASENAME: ${{ env.RELEASE_BASENAME }}"
           echo "TARBALL_BASENAME: ${{ env.TARBALL_BASENAME }}"
           echo "TARGET: ${{ env.TARGET }}"
           echo "CHANNEL_OR_TAG: ${{ env.CHANNEL_OR_TAG }}"
           echo "COMMIT: ${{ env.COMMIT }}"
-          if [ -z "${{ env.TARGET }}" ]; then echo "TARGET is unset!"; exit 1; fi
+          if [ -z "${{ env.TARGET }}" ]; then 
+            echo "TARGET is unset!"; 
+            exit 1; 
+          fi
 
       # Install Dependencies
       - name: Install Dependencies
@@ -118,10 +122,15 @@ jobs:
 
       # Extract Upload URL
       - name: Extract Upload URL
+        shell: bash  # Force Bash Shell
         run: |
           UPLOAD_URL=$(echo '${{ steps.get_latest_release.outputs.data }}' | jq -r '.upload_url' | sed 's/{?name,label}//')
-          if [ -z "$UPLOAD_URL" ]; then echo "Failed to fetch upload URL"; exit 1; fi
+          if [ -z "$UPLOAD_URL" ]; then 
+            echo "Failed to fetch upload URL"; 
+            exit 1; 
+          fi
           echo "UPLOAD_URL=${UPLOAD_URL}" >> $GITHUB_ENV
+
 
       # Verify Files Before Upload
       - name: Verify Files
