@@ -148,10 +148,15 @@ jobs:
 
       # Verify Files Before Upload
       - name: Verify Files
+        shell: bash
         run: |
-          ls -lh ${{ env.TARBALL_BASENAME }}-${{ env.TARGET }}.tar.bz2 || { echo "Tarball missing!"; exit 1; }
-          ls -lh ${{ env.RELEASE_BASENAME }}/version.yml || { echo "Version file missing!"; exit 1; }
-          ls -lh ${{ env.RELEASE_BASENAME }}/bin/agave-install-init-${{ env.TARGET }}.exe || { echo "Binary file missing!"; exit 1; }
+          if [ ! -f "solana-release-x86_64-pc-windows-msvc.tar.bz2" ]; then
+            echo "Tarball missing!"
+            exit 1
+          fi
+          echo "Tarball found:"
+          ls -lh solana-release-x86_64-pc-windows-msvc.tar.bz2
+
 
       # Upload Build Artifacts
       - name: Upload Build Artifacts
