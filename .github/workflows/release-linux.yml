@@ -195,5 +195,5 @@ jobs:
         with:
           upload_url: ${{ github.event.release.upload_url || env.UPLOAD_URL }}
           asset_path: ${{ env.RELEASE_BASENAME }}/sdk/sbf-sdk.tar.bz2
-          asset_name: sbf-sdk-x86_64-unknown-linux-gnu.tar.bz2
+          asset_name: sbf-sdk.tar.bz2
           asset_content_type: application/x-bzip2
