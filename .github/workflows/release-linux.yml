@@ -20,6 +20,10 @@ on:
         description: "Skip uploading the SBF SDK"
         required: false
         default: "false"
+      skip_cache:
+        description: "Skip the cache"
+        required: false
+        default: "false"
         
 jobs:
   build-linux:
@@ -57,6 +61,7 @@ jobs:
 
       # Cache Cargo dependencies
       - name: Cache Cargo Dependencies
+        if: inputs.skip_cache == 'false'
         uses: actions/cache@v3
         with:
           path: |
