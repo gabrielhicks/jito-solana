@@ -8,6 +8,14 @@ on:
       release_id:
         description: "ID of the release to re-run workflow for"
         required: true
+      skip_tarball:
+        description: "Skip uploading the tarball"
+        required: false
+        default: "false"
+      skip_binary:
+        description: "Skip uploading the binary"
+        required: false
+        default: "false"
         
 jobs:
   build-linux:
@@ -150,37 +158,9 @@ jobs:
           fi
           echo "Tarball exists: $TARBALL"
 
-      # Fetch Existing Release Assets
-      - name: Fetch Existing Release Assets
-        id: check_assets
-        run: |
-          echo "Checking if assets already exist..."
-          ASSETS=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            https://api.github.com/repos/${{ github.repository }}/releases/${{ github.event.release.id }}/assets | jq -r '.[].name')
-
-          echo "Existing assets: $ASSETS"
-
-          # Check for tarball
-          TAR_NAME="${{ env.TARBALL_BASENAME }}-x86_64-unknown-linux-gnu.tar.bz2"
-          if echo "$ASSETS" | grep -q "$TAR_NAME"; then
-            echo "Tarball $TAR_NAME already exists. Skipping tarball upload."
-            echo "TARBALL_EXISTS=true" >> $GITHUB_ENV
-          else
-            echo "TARBALL_EXISTS=false" >> $GITHUB_ENV
-          fi
-
-          # Check for binary
-          BINARY_NAME="agave-install-init-x86_64-unknown-linux-gnu"
-          if echo "$ASSETS" | grep -q "$BINARY_NAME"; then
-            echo "Binary $BINARY_NAME already exists. Skipping binary upload."
-            echo "BINARY_EXISTS=true" >> $GITHUB_ENV
-          else
-            echo "BINARY_EXISTS=false" >> $GITHUB_ENV
-          fi
-
       # Upload Release Tarball
       - name: Upload Release Tarball
-        if: env.TARBALL_EXISTS == 'false'
+        if: inputs.skip_tarball == 'false'
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -192,7 +172,7 @@ jobs:
 
       # Upload Binary File
       - name: Upload Binary File
-        if: env.BINARY_EXISTS == 'false'
+        if: inputs.skip_binary == 'false'
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -204,7 +184,7 @@ jobs:
 
       # Upload SBF SDK Tarball
       - name: Upload SBF SDK Tarball
-        if: env.TARBALL_EXISTS == 'false'
+        if: inputs.skip_tarball == 'false'
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
