@@ -44,7 +44,7 @@ jobs:
             exit 1
           fi
           UPLOAD_URL=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            "https://api.github.com/repos/${{ github.repository }}/releases/$RELEASE_ID" | jq -r '.upload_url' | sed 's/{?name,label}//')
+            "https://api.github.com/repos/${{ github.repository }}/releases/$RELEASE_ID" | jq -r '.upload_url')
           if [ -z "$UPLOAD_URL" ]; then
             echo "Error: Could not fetch upload URL."
             exit 1
