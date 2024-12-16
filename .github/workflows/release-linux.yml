@@ -16,6 +16,10 @@ on:
         description: "Skip uploading the binary"
         required: false
         default: "false"
+      skip_sbf_sdk:
+        description: "Skip uploading the SBF SDK"
+        required: false
+        default: "false"
         
 jobs:
   build-linux:
@@ -184,7 +188,7 @@ jobs:
 
       # Upload SBF SDK Tarball
       - name: Upload SBF SDK Tarball
-        if: inputs.skip_tarball == 'false'
+        if: inputs.skip_sbf_sdk == 'false'
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
