@@ -25,6 +25,24 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
+      # Fetch Upload URL for workflow_dispatch
+      - name: Fetch Upload URL
+        if: github.event_name == 'workflow_dispatch'
+        id: get_upload_url
+        run: |
+          RELEASE_ID=${{ inputs.release_id }}
+          if [ -z "$RELEASE_ID" ]; then
+            echo "Error: release_id input is required for workflow_dispatch."
+            exit 1
+          fi
+          UPLOAD_URL=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/$RELEASE_ID" | jq -r '.upload_url' | sed 's/{?name,label}//')
+          if [ -z "$UPLOAD_URL" ]; then
+            echo "Error: Could not fetch upload URL."
+            exit 1
+          fi
+          echo "UPLOAD_URL=$UPLOAD_URL" >> $GITHUB_ENV
+
       # Cache Cargo dependencies
       - name: Cache Cargo Dependencies
         uses: actions/cache@v3
@@ -122,15 +140,6 @@ jobs:
           name: sbf-sdk-linux
           path: ${{ env.RELEASE_BASENAME }}/sdk/sbf-sdk.tar.bz2
 
-      # Fetch Latest Release
-      - name: Fetch Latest Release
-        id: get_latest_release
-        uses: octokit/request-action@v2.x
-        with:
-          route: GET /repos/${{ github.repository }}/releases/latest
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
       # Verify Tarball Before Upload
       - name: Verify Release Tarball
         run: |
@@ -147,7 +156,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ github.event.release.upload_url }}
+          upload_url: ${{ github.event.release.upload_url || env.UPLOAD_URL }}
           asset_path: ${{ env.TARBALL_BASENAME }}-x86_64-unknown-linux-gnu.tar.bz2
           asset_name: ${{ env.TARBALL_BASENAME }}-x86_64-unknown-linux-gnu.tar.bz2
           asset_content_type: application/x-bzip2
@@ -157,7 +166,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ github.event.release.upload_url }}
+          upload_url: ${{ github.event.release.upload_url || env.UPLOAD_URL }}
           asset_path: ${{ env.RELEASE_BASENAME }}/bin/agave-install-init-x86_64-unknown-linux-gnu
           asset_name: agave-install-init-x86_64-unknown-linux-gnu
           asset_content_type: application/octet-stream
@@ -168,7 +177,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ github.event.release.upload_url }}
+          upload_url: ${{ github.event.release.upload_url || env.UPLOAD_URL }}
           asset_path: ${{ env.RELEASE_BASENAME }}/sdk/sbf-sdk.tar.bz2
-          asset_name: sbf-sdk-x86_64-unknown-linux-gnu.tar.bz2-${{ github.ref_name }}.tar.bz2
+          asset_name: sbf-sdk-x86_64-unknown-linux-gnu-${{ github.ref_name }}.tar.bz2
           asset_content_type: application/x-bzip2
