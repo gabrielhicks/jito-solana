@@ -81,7 +81,6 @@ jobs:
           key: cargo-${{ runner.os }}-$(lsb_release -rs)-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             cargo-${{ runner.os }}-$(lsb_release -rs)-
-            cargo-${{ runner.os }}-
 
       # Cache system dependencies
       - name: Install System Dependencies
