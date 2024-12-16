@@ -4,7 +4,11 @@ on:
   release:
     types: [published] 
   workflow_dispatch:    
-
+    inputs:
+      release_id:
+        description: "ID of the release to re-run workflow for"
+        required: true
+        
 jobs:
   build-linux:
     runs-on: ubuntu-latest
