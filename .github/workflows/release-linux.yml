@@ -48,16 +48,23 @@ jobs:
         run: |
           RELEASE_ID=${{ inputs.release_id }}
           if [ -z "$RELEASE_ID" ]; then
-            echo "Error: release_id input is required for workflow_dispatch."
+            echo "Error: 'release_id' input is required for workflow_dispatch."
             exit 1
           fi
+
+          echo "Fetching upload URL for release ID: $RELEASE_ID..."
           UPLOAD_URL=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
             "https://api.github.com/repos/${{ github.repository }}/releases/$RELEASE_ID" | jq -r '.upload_url')
-          if [ -z "$UPLOAD_URL" ]; then
-            echo "Error: Could not fetch upload URL."
+
+          # Explicitly check for an empty upload URL
+          if [ -z "$UPLOAD_URL" ] || [ "$UPLOAD_URL" = "null" ]; then
+            echo "Error: Failed to fetch upload URL. The release ID may be invalid or permissions are missing."
             exit 1
           fi
+
+          echo "Successfully fetched upload URL: $UPLOAD_URL"
           echo "UPLOAD_URL=$UPLOAD_URL" >> $GITHUB_ENV
+
 
       # Cache Cargo dependencies
       - name: Cache Cargo Dependencies
@@ -67,8 +74,9 @@ jobs:
           path: |
             ~/.cargo
             target
-          key: cargo-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          key: cargo-${{ runner.os }}-$(lsb_release -rs)-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
+            cargo-${{ runner.os }}-$(lsb_release -rs)-
             cargo-${{ runner.os }}-
 
       # Cache system dependencies
