@@ -1,161 +1,50 @@
-SOLANA_RELEASE=${SOLANA_RELEASE:-"v2.0.19-mod"}
-SOLANA_INSTALL_INIT_ARGS=${SOLANA_INSTALL_INIT_ARGS:-"v2.0.19-mod"}
-SOLANA_DOWNLOAD_ROOT=${SOLANA_DOWNLOAD_ROOT:-"https://github.com/gabrielhicks/jito-solana/releases/download"}
-
 #!/bin/sh
-
+# Default variables
+SOLANA_RELEASE=${SOLANA_RELEASE:-"v2.0.19-mod"}
+GITHUB_REPO="gabrielhicks/jito-solana"
+INSTALL_DIR="/home/solv/.local/share/solana/install/releases/$SOLANA_RELEASE"
+ACTIVE_DIR="/home/solv/.local/share/solana/install/active_release/bin"
 set -e
-
+# Function to display usage
 usage() {
-    cat 1>&2 <<EOF
-agave-install-init
-Initializes a new installation.
-
-USAGE:
-    agave-install-init [FLAGS] [OPTIONS] --data-dir <PATH> --pubkey <PUBKEY>
-
-FLAGS:
-    -h, --help              Prints help information
-        --no-modify-path    Don't configure the PATH environment variable
-
-OPTIONS:
-    -d, --data-dir <PATH>    Directory to store install data
-    -u, --url <URL>          JSON RPC URL for the solana cluster
-    -p, --pubkey <PUBKEY>    Public key of the update manifest
-EOF
+    echo "Usage: SOLANA_RELEASE=<tag> sh -c \"\$(curl -sSfL https://raw.githubusercontent.com/${GITHUB_REPO}/<branch>/installer)\""
 }
-
+# Main logic
 main() {
-    downloader --check
-    need_cmd uname
-    need_cmd mktemp
-    need_cmd chmod
+    need_cmd curl
+    need_cmd tar
+    need_cmd sudo
     need_cmd mkdir
-    need_cmd rm
-    need_cmd sed
-    need_cmd grep
-
-    for arg in "$@"; do
-      case "$arg" in
-        -h|--help)
-          usage
-          exit 0
-          ;;
-        *)
-          ;;
-      esac
-    done
-
-    # Detect platform (target)
-    _ostype="$(uname -s)"
-    _cputype="$(uname -m)"
-
-    case "$_ostype" in
-    Linux)
-      _ostype=unknown-linux-gnu
-      ;;
-    Darwin)
-      if [ "$_cputype" = "arm64" ]; then
-        _cputype=aarch64
-      fi
-      _ostype=apple-darwin
-      ;;
-    *)
-      err "Machine architecture is currently unsupported: $_ostype"
-      ;;
-    esac
-
-    TARGET="${_cputype}-${_ostype}"
-
-    temp_dir="$(mktemp -d 2>/dev/null || ensure mktemp -d -t agave-install-init)"
-    ensure mkdir -p "$temp_dir"
-
-    # Determine release tag
+    # Validate SOLANA_RELEASE
     if [ -z "$SOLANA_RELEASE" ]; then
-      err "SOLANA_RELEASE is not set. Please set it to the release version you want to install."
-    fi
-
-    # Download agave-install-init for the detected platform
-    agave_download_url="$SOLANA_DOWNLOAD_ROOT/$SOLANA_RELEASE/agave-install-init-$TARGET"
-    agave_binary="$temp_dir/agave-install-init"
-
-    printf 'Downloading installer from %s\n' "$agave_download_url" 1>&2
-    ensure downloader "$agave_download_url" "$agave_binary"
-    ensure chmod u+x "$agave_binary"
-
-    if [ ! -x "$agave_binary" ]; then
-        printf '%s\n' "Cannot execute $agave_binary (likely because of mounting /tmp as noexec)." 1>&2
-        printf '%s\n' "Please copy the file to a location where you can execute binaries and run ./agave-install-init." 1>&2
+        echo "Error: SOLANA_RELEASE is not set."
+        usage
         exit 1
     fi
-
-    # Download optional files (e.g., sbf-sdk, solana-release tarball)
-    optional_files="sbf-sdk.tar.bz2 solana-release-$TARGET.tar.bz2 solana-release-$TARGET.yml"
-    for file in $optional_files; do
-        url="$SOLANA_DOWNLOAD_ROOT/$SOLANA_RELEASE/$file"
-        dest="$temp_dir/$file"
-        printf 'Downloading optional file: %s\n' "$file" 1>&2
-        ensure downloader "$url" "$dest"
-    done
-
-    # Run the installer
-    if [ -z "$1" ]; then
-      # Pass default install arguments
-      ignore "$agave_binary" $SOLANA_INSTALL_INIT_ARGS
-    else
-      # Pass user-provided arguments
-      ignore "$agave_binary" "$@"
-    fi
-    retval=$?
-
+    # Build the GitHub release download URL
+    tarball_url="https://github.com/${GITHUB_REPO}/releases/download/${SOLANA_RELEASE}/validator-release-${SOLANA_RELEASE}.tar.gz"
+    # Create temporary working directory
+    temp_dir="$(mktemp -d)"
+    printf "Downloading validator release for %s from GitHub Releases...\n" "$SOLANA_RELEASE"
+    curl -L "$tarball_url" -o "$temp_dir/validator-release.tar.gz"
+    # Extract tarball
+    printf "Extracting binaries...\n"
+    mkdir -p "$INSTALL_DIR"
+    tar -xzvf "$temp_dir/validator-release.tar.gz" -C "$INSTALL_DIR"
+    # Replace active binaries
+    printf "Replacing active binaries...\n"
+    sudo rm -rf "$ACTIVE_DIR"/*
+    sudo mv "$INSTALL_DIR/bin"/* "$ACTIVE_DIR"
+    printf "Installation complete for release: %s\n" "$SOLANA_RELEASE"
     # Cleanup
-    ignore rm "$agave_binary"
-    ignore rm -rf "$temp_dir"
-
-    return "$retval"
+    rm -rf "$temp_dir"
 }
-
-err() {
-    printf 'agave-install-init: %s\n' "$1" >&2
-    exit 1
-}
-
+# Function to check if a command exists
 need_cmd() {
-    if ! check_cmd "$1"; then
-        err "need '$1' (command not found)"
+    if ! command -v "$1" >/dev/null 2>&1; then
+        echo "Error: command not found: $1" >&2
+        exit 1
     fi
 }
-
-check_cmd() {
-    command -v "$1" > /dev/null 2>&1
-}
-
-ensure() {
-    if ! "$@"; then
-      err "command failed: $*"
-    fi
-}
-
-ignore() {
-    "$@" || true
-}
-
-downloader() {
-    if check_cmd curl; then
-        program=curl
-    elif check_cmd wget; then
-        program=wget
-    else
-        err "Neither curl nor wget is available. Please install one to proceed."
-    fi
-
-    if [ "$1" = --check ]; then
-        need_cmd "$program"
-    elif [ "$program" = curl ]; then
-        curl -sSfL "$1" -o "$2"
-    elif [ "$program" = wget ]; then
-        wget "$1" -O "$2"
-    fi
-}
-
+# Run the main function
 main "$@"
