@@ -901,7 +901,7 @@ fn check_for_newer_github_release(
 
     while page == 1 || releases.len() == PER_PAGE {
         let url = reqwest::Url::parse_with_params(
-            "https://api.github.com/repos/jito-foundation/jito-solana/releases",
+            "https://api.github.com/repos/gabrielhicks/jito-solana/releases",
             &[
                 ("per_page", &format!("{PER_PAGE}")),
                 ("page", &format!("{page}")),
