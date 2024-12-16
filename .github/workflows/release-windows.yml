@@ -175,3 +175,29 @@ jobs:
           asset_path: ${{ env.RELEASE_BASENAME }}/bin/agave-install-init-${{ env.TARGET }}.exe
           asset_name: agave-install-init-${{ env.target }}
           asset_content_type: application/octet-stream
+
+      # Rename Version YAML to Match Tarball
+      - name: Rename Version YAML
+        run: |
+          VERSION_YML_PATH="${{ env.RELEASE_BASENAME }}/version.yml"
+          RENAMED_YML="${{ env.TARBALL_BASENAME }}-${{ env.target }}.yml"
+
+          if [ -f "$VERSION_YML_PATH" ]; then
+            echo "Renaming $VERSION_YML_PATH to $RENAMED_YML..."
+            cp "$VERSION_YML_PATH" "$RENAMED_YML"
+          else
+            echo "Error: version.yml does not exist!"
+            exit 1
+          fi
+          echo "Renamed version.yml: $RENAMED_YML"
+
+      # Upload Renamed Version YAML
+      - name: Upload Version YAML
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: ${{ env.TARBALL_BASENAME }}-${{ env.target }}.yml
+          asset_name: ${{ env.TARBALL_BASENAME }}-${{ env.target }}.yml
+          asset_content_type: text/yaml

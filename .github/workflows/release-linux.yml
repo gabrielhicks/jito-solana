@@ -197,3 +197,30 @@ jobs:
           asset_path: ${{ env.RELEASE_BASENAME }}/sdk/sbf-sdk.tar.bz2
           asset_name: sbf-sdk.tar.bz2
           asset_content_type: application/x-bzip2
+
+      # Rename Version YAML to Match Tarball
+      - name: Rename Version YAML
+        run: |
+          VERSION_YML_PATH="${{ env.RELEASE_BASENAME }}/version.yml"
+          RENAMED_YML="${{ env.TARBALL_BASENAME }}-x86_64-unknown-linux-gnu.yml"
+
+          if [ -f "$VERSION_YML_PATH" ]; then
+            echo "Renaming $VERSION_YML_PATH to $RENAMED_YML..."
+            cp "$VERSION_YML_PATH" "$RENAMED_YML"
+          else
+            echo "Error: version.yml does not exist!"
+            exit 1
+          fi
+          echo "Renamed version.yml: $RENAMED_YML"
+
+      # Upload Renamed Version YAML
+      - name: Upload Version YAML
+        if: inputs.skip_sbf_sdk == 'false'
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: solana-release-x86_64-unknown-linux-gnu.yml
+          asset_name: solana-release-x86_64-unknown-linux-gnu.yml
+          asset_content_type: text/yaml
