@@ -154,8 +154,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ github.event.release.upload_url }}
-          asset_path: ${{ env.RELEASE_BASENAME }}/bin/agave-install-init-x86_64-unknown-linux-gnu.tar.bz2
-          asset_name: agave-install-init-x86_64-unknown-linux-gnu.tar.bz2
+          asset_path: ${{ env.RELEASE_BASENAME }}/bin/agave-install-init-x86_64-unknown-linux-gnu
+          asset_name: agave-install-init-x86_64-unknown-linux-gnu
           asset_content_type: application/octet-stream
 
       # Upload SBF SDK Release Asset
