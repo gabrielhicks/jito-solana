@@ -568,7 +568,7 @@ pub fn init(
 
 fn github_release_download_url(release_semver: &str) -> String {
     format!(
-        "https://github.com/jito-foundation/jito-solana/releases/download/v{}/solana-release-{}.tar.bz2",
+        "https://github.com/gabrielhicks/jito-solana/releases/download/v{}/solana-release-{}.tar.bz2",
         release_semver,
         crate::build_env::TARGET
     )
