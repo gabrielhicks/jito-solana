@@ -53,12 +53,16 @@ jobs:
           fi
 
           echo "Fetching upload URL for release ID: $RELEASE_ID..."
-          UPLOAD_URL=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            "https://api.github.com/repos/${{ github.repository }}/releases/$RELEASE_ID" | jq -r '.upload_url')
+          API_RESPONSE=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/$RELEASE_ID")
 
-          # Explicitly check for an empty upload URL
+          echo "API Response: $API_RESPONSE"
+
+          UPLOAD_URL=$(echo "$API_RESPONSE" | jq -r '.upload_url')
+
           if [ -z "$UPLOAD_URL" ] || [ "$UPLOAD_URL" = "null" ]; then
-            echo "Error: Failed to fetch upload URL. The release ID may be invalid or permissions are missing."
+            echo "Error: Failed to fetch upload URL. Full API response:"
+            echo "$API_RESPONSE"
             exit 1
           fi
 
